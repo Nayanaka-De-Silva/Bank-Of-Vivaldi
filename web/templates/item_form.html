@@ -16,7 +16,7 @@
   <label>Category
     <select name="category">
       {{range .Categories}}
-        <option value="{{.}}" {{if eq $.Item.Category .}}selected{{end}}>{{.}}</option>
+        <option value="{{.}}" {{if eq $.Item.Category .}}selected{{end}}>{{humanize .}}</option>
       {{end}}
     </select>
   </label>
@@ -24,7 +24,7 @@
   <label>Rarity
     <select name="rarity">
       {{range .Rarities}}
-        <option value="{{.}}" {{if eq $.Item.Rarity .}}selected{{end}}>{{.}}</option>
+        <option value="{{.}}" {{if eq $.Item.Rarity .}}selected{{end}}>{{humanize .}}</option>
       {{end}}
     </select>
   </label>
@@ -33,9 +33,9 @@
   <label>Quantity <input type="number" name="quantity" min="1" value="{{if .Item.Quantity}}{{.Item.Quantity}}{{else}}1{{end}}"></label>
   <label>Source kind
     <select name="source_kind">
-      <option value="manual" {{if eq .Item.SourceKind "manual"}}selected{{end}}>manual</option>
-      <option value="custom" {{if eq .Item.SourceKind "custom"}}selected{{end}}>custom</option>
-      <option value="imported" {{if eq .Item.SourceKind "imported"}}selected{{end}}>imported</option>
+      <option value="manual" {{if eq .Item.SourceKind "manual"}}selected{{end}}>Manual</option>
+      <option value="custom" {{if eq .Item.SourceKind "custom"}}selected{{end}}>Custom</option>
+      <option value="imported" {{if eq .Item.SourceKind "imported"}}selected{{end}}>Imported</option>
     </select>
   </label>
 </div>

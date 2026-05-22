@@ -8,7 +8,7 @@
       <select name="category">
         <option value="">--</option>
         {{range .Categories}}
-          <option value="{{.}}" {{if eq $.Filters.Category .}}selected{{end}}>{{.}}</option>
+          <option value="{{.}}" {{if eq $.Filters.Category .}}selected{{end}}>{{humanize .}}</option>
         {{end}}
       </select>
     </label>
@@ -16,7 +16,7 @@
       <select name="rarity">
         <option value="">--</option>
         {{range .Rarities}}
-          <option value="{{.}}" {{if eq $.Filters.Rarity .}}selected{{end}}>{{.}}</option>
+          <option value="{{.}}" {{if eq $.Filters.Rarity .}}selected{{end}}>{{humanize .}}</option>
         {{end}}
       </select>
     </label>
@@ -57,8 +57,8 @@
       {{range .SearchResults}}
         <tr>
           <td><a href="/items/{{.Item.ID}}">{{.Item.Name}}</a></td>
-          <td>{{.Item.Category}}</td>
-          <td>{{.Item.Rarity}}</td>
+          <td>{{humanize .Item.Category}}</td>
+          <td>{{humanize .Item.Rarity}}</td>
           <td>{{.LocationLabel}}</td>
           <td>{{.ContainerPath}}</td>
           <td>{{.TotalWeightLB}} lb</td>

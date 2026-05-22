@@ -55,6 +55,7 @@ func NewServer(service *application.Service) (*Server, error) {
 		"eq": func(a, b any) bool { return fmt.Sprint(a) == fmt.Sprint(b) },
 		"weight": func(value int) string { return domain.FormatWeightHundredths(value) },
 		"gp": func(value int) string { return domain.FormatCopperAsGold(value) },
+		"humanize": func(value any) string { return domain.HumanizeLabel(fmt.Sprint(value)) },
 		"contains": func(haystack, needle string) bool {
 			return strings.Contains(strings.ToLower(haystack), strings.ToLower(needle))
 		},

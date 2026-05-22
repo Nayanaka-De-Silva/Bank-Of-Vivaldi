@@ -19,8 +19,8 @@
           <tr>
             <td><a href="/vaults/{{.Vault.ID}}">{{.Vault.CharacterName}}</a></td>
             <td>{{weight .TotalCarryWeightHundredths}} / {{weight .MaxCarryWeightHundredths}} lb</td>
-            <td>{{.Vault.EncumbranceMode}}</td>
-            <td>{{.EncumbranceState}}</td>
+            <td>{{humanize .Vault.EncumbranceMode}}</td>
+            <td>{{humanize .EncumbranceState}}</td>
             <td>{{if .Vault.Archived}}yes{{else}}no{{end}}</td>
           </tr>
         {{end}}
