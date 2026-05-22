@@ -1,5 +1,6 @@
 FROM golang:1.24-bookworm AS base
-ENV PATH="/usr/local/go/bin:${PATH}"
+ENV PATH="/usr/local/go/bin:${PATH}" \
+    GOFLAGS="-buildvcs=false"
 WORKDIR /app
 COPY go.mod ./
 RUN go mod download
