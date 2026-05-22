@@ -1,0 +1,74 @@
+{{define "search"}}
+{{template "page_top" .}}
+<section class="panel">
+  <h1>Search inventory</h1>
+  <form method="get" action="/search" class="grid three">
+    <label>Query <input type="text" name="q" value="{{.Filters.Query}}"></label>
+    <label>Category
+      <select name="category">
+        <option value="">--</option>
+        {{range .Categories}}
+          <option value="{{.}}" {{if eq $.Filters.Category .}}selected{{end}}>{{.}}</option>
+        {{end}}
+      </select>
+    </label>
+    <label>Rarity
+      <select name="rarity">
+        <option value="">--</option>
+        {{range .Rarities}}
+          <option value="{{.}}" {{if eq $.Filters.Rarity .}}selected{{end}}>{{.}}</option>
+        {{end}}
+      </select>
+    </label>
+    <label>Vault
+      <select name="vault_id">
+        <option value="">--</option>
+        {{range .AllVaults}}
+          <option value="{{.ID}}" {{if eq $.Filters.VaultID .ID}}selected{{end}}>{{.CharacterName}}</option>
+        {{end}}
+      </select>
+    </label>
+    <label>Container text <input type="text" name="container" value="{{.Filters.Container}}"></label>
+    <label>Sort
+      <select name="sort">
+        <option value="name" {{if eq .Filters.SortBy "name"}}selected{{end}}>Name</option>
+        <option value="weight" {{if eq .Filters.SortBy "weight"}}selected{{end}}>Weight</option>
+        <option value="value" {{if eq .Filters.SortBy "value"}}selected{{end}}>Value</option>
+        <option value="category" {{if eq .Filters.SortBy "category"}}selected{{end}}>Category</option>
+        <option value="rarity" {{if eq .Filters.SortBy "rarity"}}selected{{end}}>Rarity</option>
+      </select>
+    </label>
+    <div class="grid-span"><button type="submit">Search</button></div>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>Category</th>
+        <th>Rarity</th>
+        <th>Location</th>
+        <th>Container path</th>
+        <th>Weight</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .SearchResults}}
+        <tr>
+          <td><a href="/items/{{.Item.ID}}">{{.Item.Name}}</a></td>
+          <td>{{.Item.Category}}</td>
+          <td>{{.Item.Rarity}}</td>
+          <td>{{.LocationLabel}}</td>
+          <td>{{.ContainerPath}}</td>
+          <td>{{.TotalWeightLB}} lb</td>
+          <td>{{.TotalValueText}}</td>
+        </tr>
+      {{else}}
+        <tr><td colspan="7">No matching items.</td></tr>
+      {{end}}
+    </tbody>
+  </table>
+</section>
+{{template "page_bottom" .}}
+{{end}}

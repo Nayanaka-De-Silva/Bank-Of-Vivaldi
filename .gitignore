@@ -1,0 +1,5 @@
+.env
+.DS_Store
+tmp/
+coverage.out
+D&D 5E - Player's Handbook.pdf

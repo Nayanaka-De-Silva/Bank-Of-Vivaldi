@@ -1,0 +1,46 @@
+{{define "vaults"}}
+{{template "page_top" .}}
+<section class="grid two">
+  <article class="panel">
+    <h1>Vaults</h1>
+    {{if .Vaults}}
+      <table>
+        <thead>
+          <tr>
+            <th>Character</th>
+            <th>Carry</th>
+            <th>Mode</th>
+            <th>State</th>
+            <th>Archived</th>
+          </tr>
+        </thead>
+        <tbody>
+        {{range .Vaults}}
+          <tr>
+            <td><a href="/vaults/{{.Vault.ID}}">{{.Vault.CharacterName}}</a></td>
+            <td>{{weight .TotalCarryWeightHundredths}} / {{weight .MaxCarryWeightHundredths}} lb</td>
+            <td>{{.Vault.EncumbranceMode}}</td>
+            <td>{{.EncumbranceState}}</td>
+            <td>{{if .Vault.Archived}}yes{{else}}no{{end}}</td>
+          </tr>
+        {{end}}
+        </tbody>
+      </table>
+    {{else}}
+      <p>No vaults have been created yet.</p>
+    {{end}}
+  </article>
+
+  <article class="panel">
+    <h2>Create vault</h2>
+    <form method="post" action="/vaults" class="stack">
+      <label>Character name <input type="text" name="character_name" required></label>
+      <label>Strength score <input type="number" name="strength_score" min="1" value="10" required></label>
+      <label>Carry modifier (lb) <input type="number" name="carry_modifier_lb" value="0"></label>
+      <label>Notes <textarea name="notes" rows="4"></textarea></label>
+      <button type="submit">Create vault</button>
+    </form>
+  </article>
+</section>
+{{template "page_bottom" .}}
+{{end}}

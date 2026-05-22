@@ -1,0 +1,13 @@
+{{define "compendium"}}
+{{template "page_top" .}}
+<section class="panel">
+  <h1>Compendium</h1>
+  <p>Prepared DM items live here with no strength-based carry cap.</p>
+  {{if .CompendiumItems}}
+    {{template "item_nodes" .CompendiumItems}}
+  {{else}}
+    <p>The compendium is empty.</p>
+  {{end}}
+</section>
+{{template "page_bottom" .}}
+{{end}}

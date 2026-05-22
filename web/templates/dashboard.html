@@ -1,0 +1,51 @@
+{{define "dashboard"}}
+{{template "page_top" .}}
+<section class="hero">
+  <h1>Campaign dashboard</h1>
+  <p>Track vault weight, purse totals, and the compendium from one chrome-clean control panel.</p>
+</section>
+
+<section class="grid two">
+  <article class="panel">
+    <h2>Vault summaries</h2>
+    {{if .Dashboard.Vaults}}
+      <table>
+        <thead>
+          <tr>
+            <th>Vault</th>
+            <th>Carry</th>
+            <th>Capacity</th>
+            <th>State</th>
+            <th>Total Value</th>
+          </tr>
+        </thead>
+        <tbody>
+        {{range .Dashboard.Vaults}}
+          <tr>
+            <td><a href="/vaults/{{.Vault.ID}}">{{.Vault.CharacterName}}</a></td>
+            <td>{{weight .TotalCarryWeightHundredths}} lb</td>
+            <td>{{weight .MaxCarryWeightHundredths}} lb</td>
+            <td>{{.EncumbranceState}}</td>
+            <td>{{gp .TotalCombinedValueCP}}</td>
+          </tr>
+        {{end}}
+        </tbody>
+      </table>
+    {{else}}
+      <p>No vaults yet.</p>
+    {{end}}
+  </article>
+
+  <article class="panel">
+    <h2>Compendium</h2>
+    <p><strong>Total weight:</strong> {{weight .Dashboard.CompendiumWeight}} lb</p>
+    <p><strong>Total value:</strong> {{gp .Dashboard.CompendiumValueCP}}</p>
+    {{if .Dashboard.CompendiumRootItems}}
+      {{template "item_nodes" .Dashboard.CompendiumRootItems}}
+    {{else}}
+      <p>No compendium items yet.</p>
+    {{end}}
+  </article>
+</section>
+{{template "page_bottom" .}}
+{{end}}

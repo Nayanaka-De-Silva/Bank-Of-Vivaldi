@@ -1,0 +1,60 @@
+{{define "page_top"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}} - Bank of Vivaldi</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <a href="/">Bank of Vivaldi</a>
+      <span class="subtitle">DM inventory manager</span>
+    </div>
+    <nav class="nav">
+      <a href="/vaults">Vaults</a>
+      <a href="/compendium">Compendium</a>
+      <a href="/items/new">New Item</a>
+      <a href="/bulk">Bulk Entry</a>
+      <a href="/search">Search</a>
+    </nav>
+    <form method="post" action="/settings/encumbrance" class="inline-form">
+      <label for="mode">Ruleset</label>
+      <select id="mode" name="mode">
+        <option value="standard" {{if eq .AppSettings.DefaultEncumbranceMode "standard"}}selected{{end}}>Standard</option>
+        <option value="optional" {{if eq .AppSettings.DefaultEncumbranceMode "optional"}}selected{{end}}>Optional Encumbrance</option>
+      </select>
+      <button type="submit">Apply</button>
+    </form>
+  </header>
+  <main class="container">
+    {{if .Notice}}<p class="notice">{{.Notice}}</p>{{end}}
+    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+{{end}}
+
+{{define "page_bottom"}}
+  </main>
+</body>
+</html>
+{{end}}
+
+{{define "item_nodes"}}
+<ul class="item-tree">
+  {{range .}}
+    <li>
+      <div class="item-row">
+        <a href="/items/{{.Item.ID}}">{{.Item.Name}}</a>
+        <span class="muted">{{.Item.Category}}</span>
+        <span>{{.Item.Quantity}}x</span>
+        <span>{{weight .TotalWeightHundredths}} lb</span>
+        <span>{{gp .TotalValueCP}}</span>
+      </div>
+      {{if .Children}}
+        {{template "item_nodes" .Children}}
+      {{end}}
+    </li>
+  {{end}}
+</ul>
+{{end}}

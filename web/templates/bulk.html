@@ -1,0 +1,106 @@
+{{define "bulk"}}
+{{template "page_top" .}}
+<section class="grid two">
+  <article class="panel">
+    <h1>Bulk item entry</h1>
+    <p>Paste one item per line. Optional format: <code>2x Rope | equipment | mundane | 10 | 100</code></p>
+    <form method="post" action="/bulk/preview" class="stack">
+      <label>Lines
+        <textarea name="bulk_text" rows="16">{{.BulkText}}</textarea>
+      </label>
+      <div class="grid two">
+        <label>Default category
+          <select name="default_category">
+            <option value="">--</option>
+            {{range .Categories}}
+              <option value="{{.}}" {{if eq $.BulkDefaultsCategory .}}selected{{end}}>{{.}}</option>
+            {{end}}
+          </select>
+        </label>
+        <label>Default rarity
+          <select name="default_rarity">
+            <option value="">--</option>
+            {{range .Rarities}}
+              <option value="{{.}}" {{if eq $.BulkDefaultsRarity .}}selected{{end}}>{{.}}</option>
+            {{end}}
+          </select>
+        </label>
+        <label>Default weight (lb) <input type="text" name="default_weight_lb" value="{{.BulkDefaultsWeight}}"></label>
+        <label>Default value (cp) <input type="number" name="default_value_cp" value="{{.BulkDefaultsValue}}"></label>
+      </div>
+      <div class="grid three">
+        <label>Location kind
+          <select name="location_kind">
+            <option value="compendium" {{if eq .SelectedLocationKind "compendium"}}selected{{end}}>Compendium root</option>
+            <option value="vault" {{if eq .SelectedLocationKind "vault"}}selected{{end}}>Vault root</option>
+            <option value="container" {{if eq .SelectedLocationKind "container"}}selected{{end}}>Container</option>
+          </select>
+        </label>
+        <label>Vault
+          <select name="vault_id">
+            <option value="">--</option>
+            {{range .AllVaults}}
+              <option value="{{.ID}}" {{if eq $.SelectedVaultID .ID}}selected{{end}}>{{.CharacterName}}</option>
+            {{end}}
+          </select>
+        </label>
+        <label>Container
+          <select name="parent_container_item_id">
+            <option value="">--</option>
+            {{range .ContainerOptions}}
+              <option value="{{.ID}}" {{if eq $.SelectedParentContainerID .ID}}selected{{end}}>{{.Name}}</option>
+            {{end}}
+          </select>
+        </label>
+      </div>
+      <label><input type="checkbox" name="is_stackable" {{if .BulkIsStackable}}checked{{end}}> Mark imported rows as stackable</label>
+      <button type="submit">Preview import</button>
+    </form>
+  </article>
+
+  <article class="panel">
+    <h2>Preview</h2>
+    {{if .BulkPreview.Rows}}
+      <table>
+        <thead>
+          <tr>
+            <th>Line</th>
+            <th>Name</th>
+            <th>Qty</th>
+            <th>Category</th>
+            <th>Rarity</th>
+            <th>Weight</th>
+            <th>Value</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .BulkPreview.Rows}}
+            <tr>
+              <td>{{.LineNumber}}</td>
+              <td>{{.Name}}</td>
+              <td>{{.Quantity}}</td>
+              <td>{{.Category}}</td>
+              <td>{{.Rarity}}</td>
+              <td>{{weight .WeightHundredthsLB}}</td>
+              <td>{{gp .BaseValueCP}}</td>
+              <td>{{if .Errors}}{{range .Errors}}<div class="error-inline">{{.}}</div>{{end}}{{else}}ready{{end}}</td>
+            </tr>
+          {{end}}
+        </tbody>
+      </table>
+      <form method="post" action="/bulk/commit" class="stack">
+        <input type="hidden" name="encoded_rows" value="{{.EncodedRows}}">
+        <input type="hidden" name="location_kind" value="{{.SelectedLocationKind}}">
+        <input type="hidden" name="vault_id" value="{{.SelectedVaultID}}">
+        <input type="hidden" name="parent_container_item_id" value="{{.SelectedParentContainerID}}">
+        {{if .BulkIsStackable}}<input type="hidden" name="is_stackable" value="on">{{end}}
+        <button type="submit" {{if not .BulkPreview.Valid}}disabled{{end}}>Commit rows</button>
+      </form>
+    {{else}}
+      <p>No preview yet.</p>
+    {{end}}
+  </article>
+</section>
+{{template "page_bottom" .}}
+{{end}}
