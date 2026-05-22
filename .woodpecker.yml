@@ -1,20 +1,49 @@
 steps:
-  test:
+  - name: verify
     image: golang:1.24-bookworm
+    environment:
+      GOFLAGS: -buildvcs=false
     commands:
       - go mod download
       - go test ./...
-
-  build:
-    image: golang:1.24-bookworm
-    commands:
-      - go mod download
       - go build ./cmd/...
-
-  image:
-    image: docker:27-cli
-    commands:
-      - docker build -t bank-of-vivaldi:ci .
     when:
-      event:
-        - push
+      - event: [push, pull_request]
+
+  - name: build-image
+    image: docker:27
+    privileged: true
+    depends_on:
+      - verify
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    commands:
+      - docker build --pull -t bank-of-vivaldi:latest .
+    when:
+      - event: push
+        branch: master
+
+  - name: deploy
+    image: docker:27
+    privileged: true
+    depends_on:
+      - build-image
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/krystler/containers/bank-of-vivaldi:/deploy
+    commands:
+      - mkdir -p /deploy
+      - cp docker-compose.prod.yml /deploy/docker-compose.prod.yml
+      - cp .env.example /deploy/.env.example
+      - |-
+        test -f /deploy/.env || {
+          echo "Missing /deploy/.env. Copy /deploy/.env.example to /deploy/.env and set production values before deploying." >&2
+          exit 1
+        }
+      - cd /deploy
+      - docker compose -p bank-of-vivaldi -f ./docker-compose.prod.yml config >/dev/null
+      - APP_IMAGE=bank-of-vivaldi:latest docker compose -p bank-of-vivaldi -f ./docker-compose.prod.yml up --force-recreate -d --remove-orphans --wait --wait-timeout 120
+      - docker image prune -f
+    when:
+      - event: push
+        branch: master

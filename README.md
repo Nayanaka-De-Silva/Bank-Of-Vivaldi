@@ -26,6 +26,13 @@ docker compose run --rm app go build ./cmd/...
 docker compose run --rm app go run ./cmd/migrate
 ```
 
+## Woodpecker CI/CD
+
+- CI runs `go test ./...` and `go build ./cmd/...` on pushes and pull requests.
+- CD builds the runtime image on pushes to `master` and deploys with `docker-compose.prod.yml`.
+- The deploy step manages `/home/krystler/containers/bank-of-vivaldi` on the Woodpecker runner host.
+- Before enabling deploys, copy `.env.example` to `/home/krystler/containers/bank-of-vivaldi/.env` and set production values.
+
 ## Repo bootstrap and handoff
 
 - This project is being bootstrapped as a **standalone Git repository** rooted at `bank-of-vivaldi`.
