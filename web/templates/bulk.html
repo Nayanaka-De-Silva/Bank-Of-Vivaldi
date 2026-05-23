@@ -13,7 +13,7 @@
           <select name="default_category">
             <option value="">--</option>
             {{range .Categories}}
-              <option value="{{.}}" {{if eq $.BulkDefaultsCategory .}}selected{{end}}>{{.}}</option>
+              <option value="{{.}}" {{if eq $.BulkDefaultsCategory .}}selected{{end}}>{{humanize .}}</option>
             {{end}}
           </select>
         </label>
@@ -21,7 +21,7 @@
           <select name="default_rarity">
             <option value="">--</option>
             {{range .Rarities}}
-              <option value="{{.}}" {{if eq $.BulkDefaultsRarity .}}selected{{end}}>{{.}}</option>
+              <option value="{{.}}" {{if eq $.BulkDefaultsRarity .}}selected{{end}}>{{humanize .}}</option>
             {{end}}
           </select>
         </label>
@@ -80,8 +80,8 @@
               <td>{{.LineNumber}}</td>
               <td>{{.Name}}</td>
               <td>{{.Quantity}}</td>
-              <td>{{.Category}}</td>
-              <td>{{.Rarity}}</td>
+              <td>{{humanize .Category}}</td>
+              <td>{{humanize .Rarity}}</td>
               <td>{{weight .WeightHundredthsLB}}</td>
               <td>{{gp .BaseValueCP}}</td>
               <td>{{if .Errors}}{{range .Errors}}<div class="error-inline">{{.}}</div>{{end}}{{else}}ready{{end}}</td>

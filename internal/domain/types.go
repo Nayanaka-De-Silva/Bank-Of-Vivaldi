@@ -380,3 +380,22 @@ func FormatCopperAsGold(valueCP int) string {
 	}
 	return fmt.Sprintf("%s%d.%02d gp", sign, whole, fraction)
 }
+
+func HumanizeLabel(value string) string {
+	normalized := strings.TrimSpace(strings.NewReplacer("-", " ", "_", " ").Replace(value))
+	if normalized == "" {
+		return ""
+	}
+
+	words := strings.Fields(normalized)
+	for index, word := range words {
+		runes := []rune(strings.ToLower(word))
+		if len(runes) == 0 {
+			continue
+		}
+		runes[0] = unicode.ToUpper(runes[0])
+		words[index] = string(runes)
+	}
+
+	return strings.Join(words, " ")
+}

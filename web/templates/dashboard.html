@@ -25,7 +25,7 @@
             <td><a href="/vaults/{{.Vault.ID}}">{{.Vault.CharacterName}}</a></td>
             <td>{{weight .TotalCarryWeightHundredths}} lb</td>
             <td>{{weight .MaxCarryWeightHundredths}} lb</td>
-            <td>{{.EncumbranceState}}</td>
+            <td>{{humanize .EncumbranceState}}</td>
             <td>{{gp .TotalCombinedValueCP}}</td>
           </tr>
         {{end}}

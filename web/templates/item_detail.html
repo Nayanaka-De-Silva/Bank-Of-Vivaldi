@@ -3,8 +3,8 @@
 <section class="grid two">
   <article class="panel">
     <h1>{{.ItemDetail.Item.Name}}</h1>
-    <p><strong>Category:</strong> {{.ItemDetail.Item.Category}}</p>
-    <p><strong>Rarity:</strong> {{.ItemDetail.Item.Rarity}}</p>
+    <p><strong>Category:</strong> {{humanize .ItemDetail.Item.Category}}</p>
+    <p><strong>Rarity:</strong> {{humanize .ItemDetail.Item.Rarity}}</p>
     <p><strong>Location:</strong> {{.ItemDetail.LocationLabel}}</p>
     <p><strong>Total weight:</strong> {{weight .ItemDetail.Item.TotalWeightHundredthsLB}} lb</p>
     <p><strong>Total value:</strong> {{gp .ItemDetail.Item.TotalValueCP}}</p>
