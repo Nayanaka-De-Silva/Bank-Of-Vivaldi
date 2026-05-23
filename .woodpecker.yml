@@ -1,5 +1,5 @@
 steps:
-  verify:
+  - name: verify
     image: golang:1.24-bookworm
     environment:
       GOFLAGS: -buildvcs=false
@@ -7,12 +7,8 @@ steps:
       - go mod download
       - go test ./...
       - go build ./cmd/...
-    when:
-      event:
-        - push
-        - pull_request
 
-  build-image:
+  - name: build-image
     image: docker:27
     privileged: true
     depends_on:
@@ -22,12 +18,10 @@ steps:
     commands:
       - docker build --pull -t bank-of-vivaldi:latest .
     when:
-      event:
-        - push
-      branch:
-        - master
+      - event: push
+        branch: master
 
-  deploy:
+  - name: deploy
     image: docker:27
     privileged: true
     depends_on:
@@ -49,7 +43,5 @@ steps:
       - APP_IMAGE=bank-of-vivaldi:latest docker compose -p bank-of-vivaldi -f ./docker-compose.prod.yml up --force-recreate -d --remove-orphans --wait --wait-timeout 120
       - docker image prune -f
     when:
-      event:
-        - push
-      branch:
-        - master
+      - event: push
+        branch: master
