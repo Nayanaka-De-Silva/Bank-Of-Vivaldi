@@ -19,6 +19,7 @@
 {{ $showMount := itemMetadataVisible $selectedCategory "mount" }}
 {{ $showVehicle := itemMetadataVisible $selectedCategory "vehicle" }}
 {{ $showTreasure := itemMetadataVisible $selectedCategory "treasure" }}
+{{ $hasVisibleMetadata := or $showContainer $showArmor $showWeapon $showTool $showMount $showVehicle $showTreasure }}
 <div class="grid two">
   <label>Name <input type="text" name="name" value="{{.Item.Name}}" required></label>
   <label>Category
@@ -85,12 +86,8 @@
   </label>
 </div>
 
-<h2>Specialized metadata</h2>
-<div class="stack">
-  <p class="muted metadata-empty" data-metadata-empty {{if or $showContainer $showArmor $showWeapon $showTool $showMount $showVehicle $showTreasure}}hidden{{end}}>
-    No specialized metadata fields are needed for the selected category.
-  </p>
-
+<section class="stack" data-metadata-section {{if not $hasVisibleMetadata}}hidden{{end}}>
+  <h2>Specialized metadata</h2>
   <section class="metadata-group stack" data-metadata-group="container" {{if not $showContainer}}hidden{{end}}>
     <h3>Container metadata</h3>
     <div class="grid two">
@@ -193,7 +190,7 @@
       </label>
     </div>
   </section>
-</div>
+</section>
 
 <script>
 (() => {
@@ -204,8 +201,8 @@
 
   const categorySelect = form.querySelector('select[name="category"]');
   const isContainerCheckbox = form.querySelector('input[name="is_container"]');
+  const metadataSection = form.querySelector("[data-metadata-section]");
   const metadataGroups = Array.from(form.querySelectorAll("[data-metadata-group]"));
-  const emptyState = form.querySelector("[data-metadata-empty]");
   if (!categorySelect || metadataGroups.length === 0) {
     return;
   }
@@ -226,8 +223,8 @@
       }
     });
 
-    if (emptyState) {
-      emptyState.hidden = hasVisibleGroup;
+    if (metadataSection) {
+      metadataSection.hidden = !hasVisibleGroup;
     }
   };
 
