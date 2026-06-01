@@ -11,12 +11,20 @@
 {{end}}
 
 {{define "item_form_fields"}}
+{{ $selectedCategory := itemFormCategory .Item.Category }}
+{{ $showContainer := containerMetadataVisible $selectedCategory .Item.IsContainer }}
+{{ $showArmor := itemMetadataVisible $selectedCategory "armor" }}
+{{ $showWeapon := itemMetadataVisible $selectedCategory "weapon" }}
+{{ $showTool := itemMetadataVisible $selectedCategory "tool" }}
+{{ $showMount := itemMetadataVisible $selectedCategory "mount" }}
+{{ $showVehicle := itemMetadataVisible $selectedCategory "vehicle" }}
+{{ $showTreasure := itemMetadataVisible $selectedCategory "treasure" }}
 <div class="grid two">
   <label>Name <input type="text" name="name" value="{{.Item.Name}}" required></label>
   <label>Category
     <select name="category">
       {{range .Categories}}
-        <option value="{{.}}" {{if eq $.Item.Category .}}selected{{end}}>{{humanize .}}</option>
+        <option value="{{.}}" {{if eq $selectedCategory .}}selected{{end}}>{{humanize .}}</option>
       {{end}}
     </select>
   </label>
@@ -78,67 +86,156 @@
 </div>
 
 <h2>Specialized metadata</h2>
-<div class="grid two">
-  <label>Container max weight (lb)
-    <input type="text" name="container_max_weight_lb" value="{{with .Item.Details.Container}}{{weight .MaxWeightHundredthsLB}}{{end}}">
-  </label>
-  <label>Armor category
-    <input type="text" name="armor_category" value="{{with .Item.Details.Armor}}{{.ArmorCategory}}{{end}}">
-  </label>
-  <label>Armor base AC
-    <input type="number" name="armor_base_ac" value="{{with .Item.Details.Armor}}{{.BaseAC}}{{end}}">
-  </label>
-  <label>Armor dex behavior
-    <input type="text" name="armor_dex_behavior" value="{{with .Item.Details.Armor}}{{.DexModifierBehavior}}{{end}}">
-  </label>
-  <label>Armor strength requirement
-    <input type="number" name="armor_strength_requirement" value="{{with .Item.Details.Armor}}{{.StrengthRequirement}}{{end}}">
-  </label>
-  <label><input type="checkbox" name="armor_stealth_disadvantage" {{with .Item.Details.Armor}}{{if .StealthDisadvantage}}checked{{end}}{{end}}> Armor stealth disadvantage</label>
-  <label>Weapon class
-    <input type="text" name="weapon_class" value="{{with .Item.Details.Weapon}}{{.WeaponClass}}{{end}}">
-  </label>
-  <label>Weapon damage dice
-    <input type="text" name="weapon_damage_dice" value="{{with .Item.Details.Weapon}}{{.DamageDice}}{{end}}">
-  </label>
-  <label>Weapon damage type
-    <input type="text" name="weapon_damage_type" value="{{with .Item.Details.Weapon}}{{.DamageType}}{{end}}">
-  </label>
-  <label>Weapon properties
-    <input type="text" name="weapon_properties" value="{{with .Item.Details.Weapon}}{{range $index, $value := .Properties}}{{if $index}}, {{end}}{{$value}}{{end}}{{end}}">
-  </label>
-  <label>Weapon normal range
-    <input type="number" name="weapon_normal_range" value="{{with .Item.Details.Weapon}}{{.NormalRange}}{{end}}">
-  </label>
-  <label>Weapon long range
-    <input type="number" name="weapon_long_range" value="{{with .Item.Details.Weapon}}{{.LongRange}}{{end}}">
-  </label>
-  <label>Tool category
-    <input type="text" name="tool_category" value="{{with .Item.Details.Tool}}{{.ToolCategory}}{{end}}">
-  </label>
-  <label>Tool notes
-    <input type="text" name="tool_proficiency_notes" value="{{with .Item.Details.Tool}}{{.ProficiencyNotes}}{{end}}">
-  </label>
-  <label>Mount type
-    <input type="text" name="mount_type" value="{{with .Item.Details.Mount}}{{.MountType}}{{end}}">
-  </label>
-  <label>Mount speed
-    <input type="number" name="mount_speed" value="{{with .Item.Details.Mount}}{{.MovementSpeed}}{{end}}">
-  </label>
-  <label>Mount carrying capacity (lb)
-    <input type="text" name="mount_carrying_capacity_lb" value="{{with .Item.Details.Mount}}{{weight .CarryingCapacityHundredthsLB}}{{end}}">
-  </label>
-  <label>Vehicle type
-    <input type="text" name="vehicle_type" value="{{with .Item.Details.Vehicle}}{{.VehicleType}}{{end}}">
-  </label>
-  <label>Vehicle speed
-    <input type="number" name="vehicle_speed" value="{{with .Item.Details.Vehicle}}{{.MovementSpeed}}{{end}}">
-  </label>
-  <label>Vehicle carrying capacity (lb)
-    <input type="text" name="vehicle_carrying_capacity_lb" value="{{with .Item.Details.Vehicle}}{{weight .CarryingCapacityHundredthsLB}}{{end}}">
-  </label>
-  <label>Treasure kind
-    <input type="text" name="treasure_kind" value="{{with .Item.Details.Treasure}}{{.TreasureKind}}{{end}}">
-  </label>
+<div class="stack">
+  <p class="muted metadata-empty" data-metadata-empty {{if or $showContainer $showArmor $showWeapon $showTool $showMount $showVehicle $showTreasure}}hidden{{end}}>
+    No specialized metadata fields are needed for the selected category.
+  </p>
+
+  <section class="metadata-group stack" data-metadata-group="container" {{if not $showContainer}}hidden{{end}}>
+    <h3>Container metadata</h3>
+    <div class="grid two">
+      <label>Container max weight (lb)
+        <input type="text" name="container_max_weight_lb" value="{{with .Item.Details.Container}}{{weight .MaxWeightHundredthsLB}}{{end}}">
+      </label>
+    </div>
+  </section>
+
+  <section class="metadata-group stack" data-metadata-group="armor" {{if not $showArmor}}hidden{{end}}>
+    <h3>Armor metadata</h3>
+    <div class="grid two">
+      <label>Armor category
+        <input type="text" name="armor_category" value="{{with .Item.Details.Armor}}{{.ArmorCategory}}{{end}}">
+      </label>
+      <label>Armor base AC
+        <input type="number" name="armor_base_ac" value="{{with .Item.Details.Armor}}{{.BaseAC}}{{end}}">
+      </label>
+      <label>Armor dex behavior
+        <input type="text" name="armor_dex_behavior" value="{{with .Item.Details.Armor}}{{.DexModifierBehavior}}{{end}}">
+      </label>
+      <label>Armor strength requirement
+        <input type="number" name="armor_strength_requirement" value="{{with .Item.Details.Armor}}{{.StrengthRequirement}}{{end}}">
+      </label>
+      <label><input type="checkbox" name="armor_stealth_disadvantage" {{with .Item.Details.Armor}}{{if .StealthDisadvantage}}checked{{end}}{{end}}> Armor stealth disadvantage</label>
+    </div>
+  </section>
+
+  <section class="metadata-group stack" data-metadata-group="weapon" {{if not $showWeapon}}hidden{{end}}>
+    <h3>Weapon metadata</h3>
+    <div class="grid two">
+      <label>Weapon class
+        <input type="text" name="weapon_class" value="{{with .Item.Details.Weapon}}{{.WeaponClass}}{{end}}">
+      </label>
+      <label>Weapon damage dice
+        <input type="text" name="weapon_damage_dice" value="{{with .Item.Details.Weapon}}{{.DamageDice}}{{end}}">
+      </label>
+      <label>Weapon damage type
+        <input type="text" name="weapon_damage_type" value="{{with .Item.Details.Weapon}}{{.DamageType}}{{end}}">
+      </label>
+      <label>Weapon properties
+        <input type="text" name="weapon_properties" value="{{with .Item.Details.Weapon}}{{range $index, $value := .Properties}}{{if $index}}, {{end}}{{$value}}{{end}}{{end}}">
+      </label>
+      <label>Weapon normal range
+        <input type="number" name="weapon_normal_range" value="{{with .Item.Details.Weapon}}{{.NormalRange}}{{end}}">
+      </label>
+      <label>Weapon long range
+        <input type="number" name="weapon_long_range" value="{{with .Item.Details.Weapon}}{{.LongRange}}{{end}}">
+      </label>
+    </div>
+  </section>
+
+  <section class="metadata-group stack" data-metadata-group="tool" {{if not $showTool}}hidden{{end}}>
+    <h3>Tool metadata</h3>
+    <div class="grid two">
+      <label>Tool category
+        <input type="text" name="tool_category" value="{{with .Item.Details.Tool}}{{.ToolCategory}}{{end}}">
+      </label>
+      <label>Tool notes
+        <input type="text" name="tool_proficiency_notes" value="{{with .Item.Details.Tool}}{{.ProficiencyNotes}}{{end}}">
+      </label>
+    </div>
+  </section>
+
+  <section class="metadata-group stack" data-metadata-group="mount" {{if not $showMount}}hidden{{end}}>
+    <h3>Mount metadata</h3>
+    <div class="grid two">
+      <label>Mount type
+        <input type="text" name="mount_type" value="{{with .Item.Details.Mount}}{{.MountType}}{{end}}">
+      </label>
+      <label>Mount speed
+        <input type="number" name="mount_speed" value="{{with .Item.Details.Mount}}{{.MovementSpeed}}{{end}}">
+      </label>
+      <label>Mount carrying capacity (lb)
+        <input type="text" name="mount_carrying_capacity_lb" value="{{with .Item.Details.Mount}}{{weight .CarryingCapacityHundredthsLB}}{{end}}">
+      </label>
+    </div>
+  </section>
+
+  <section class="metadata-group stack" data-metadata-group="vehicle" {{if not $showVehicle}}hidden{{end}}>
+    <h3>Vehicle metadata</h3>
+    <div class="grid two">
+      <label>Vehicle type
+        <input type="text" name="vehicle_type" value="{{with .Item.Details.Vehicle}}{{.VehicleType}}{{end}}">
+      </label>
+      <label>Vehicle speed
+        <input type="number" name="vehicle_speed" value="{{with .Item.Details.Vehicle}}{{.MovementSpeed}}{{end}}">
+      </label>
+      <label>Vehicle carrying capacity (lb)
+        <input type="text" name="vehicle_carrying_capacity_lb" value="{{with .Item.Details.Vehicle}}{{weight .CarryingCapacityHundredthsLB}}{{end}}">
+      </label>
+    </div>
+  </section>
+
+  <section class="metadata-group stack" data-metadata-group="treasure" {{if not $showTreasure}}hidden{{end}}>
+    <h3>Treasure metadata</h3>
+    <div class="grid two">
+      <label>Treasure kind
+        <input type="text" name="treasure_kind" value="{{with .Item.Details.Treasure}}{{.TreasureKind}}{{end}}">
+      </label>
+    </div>
+  </section>
 </div>
+
+<script>
+(() => {
+  const form = document.currentScript.closest("form");
+  if (!form) {
+    return;
+  }
+
+  const categorySelect = form.querySelector('select[name="category"]');
+  const isContainerCheckbox = form.querySelector('input[name="is_container"]');
+  const metadataGroups = Array.from(form.querySelectorAll("[data-metadata-group]"));
+  const emptyState = form.querySelector("[data-metadata-empty]");
+  if (!categorySelect || metadataGroups.length === 0) {
+    return;
+  }
+
+  const syncMetadataGroups = () => {
+    const activeCategory = (categorySelect.value || "equipment").toLowerCase();
+    let hasVisibleGroup = false;
+    metadataGroups.forEach((group) => {
+      const visible = group.dataset.metadataGroup === "container"
+        ? activeCategory === "container" || Boolean(isContainerCheckbox && isContainerCheckbox.checked)
+        : group.dataset.metadataGroup === activeCategory;
+      group.hidden = !visible;
+      group.querySelectorAll("input, select, textarea").forEach((input) => {
+        input.disabled = !visible;
+      });
+      if (visible) {
+        hasVisibleGroup = true;
+      }
+    });
+
+    if (emptyState) {
+      emptyState.hidden = hasVisibleGroup;
+    }
+  };
+
+  categorySelect.addEventListener("change", syncMetadataGroups);
+  if (isContainerCheckbox) {
+    isContainerCheckbox.addEventListener("change", syncMetadataGroups);
+  }
+  syncMetadataGroups();
+})();
+</script>
 {{end}}

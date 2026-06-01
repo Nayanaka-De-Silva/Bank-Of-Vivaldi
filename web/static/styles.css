@@ -195,6 +195,22 @@ td {
   border: 1px solid rgba(255, 107, 107, 0.4);
 }
 
+.metadata-empty {
+  margin: 0;
+}
+
+.metadata-group {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  background: var(--panel-2);
+}
+
+.metadata-group h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
 .item-tree {
   list-style: none;
   margin: 0;
