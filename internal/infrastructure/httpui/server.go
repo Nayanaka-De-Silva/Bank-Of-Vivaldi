@@ -21,41 +21,62 @@ type Server struct {
 }
 
 type TemplateData struct {
-	Title                    string
-	Notice                   string
-	Error                    string
-	AppSettings              domain.AppSettings
-	Dashboard                application.DashboardData
-	Vaults                   []application.VaultSummary
-	VaultDetail              application.VaultDetail
-	ItemDetail               application.ItemDetail
-	CompendiumItems          []application.ItemNode
-	SearchResults            []application.SearchResult
-	BulkPreview              domain.BulkPreview
-	BulkText                 string
-	EncodedRows              string
-	AllVaults                []domain.Vault
-	ContainerOptions         []domain.Item
-	Categories               []string
-	Rarities                 []string
-	Item                     domain.Item
-	Filters                  application.SearchFilters
-	SelectedLocationKind     string
-	SelectedVaultID          string
+	Title                     string
+	Notice                    string
+	Error                     string
+	AppSettings               domain.AppSettings
+	Dashboard                 application.DashboardData
+	Vaults                    []application.VaultSummary
+	VaultDetail               application.VaultDetail
+	ItemDetail                application.ItemDetail
+	CompendiumItems           []application.ItemNode
+	SearchResults             []application.SearchResult
+	BulkPreview               domain.BulkPreview
+	BulkText                  string
+	EncodedRows               string
+	AllVaults                 []domain.Vault
+	ContainerOptions          []domain.Item
+	Categories                []string
+	Rarities                  []string
+	Item                      domain.Item
+	Filters                   application.SearchFilters
+	SelectedLocationKind      string
+	SelectedVaultID           string
 	SelectedParentContainerID string
-	BulkDefaultsCategory     string
-	BulkDefaultsRarity       string
-	BulkDefaultsWeight       string
-	BulkDefaultsValue        string
-	BulkIsStackable          bool
+	BulkDefaultsCategory      string
+	BulkDefaultsRarity        string
+	BulkDefaultsWeight        string
+	BulkDefaultsValue         string
+	BulkIsStackable           bool
+}
+
+const defaultItemFormCategory = "equipment"
+
+func normalizeItemFormCategory(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if normalized == "" {
+		return defaultItemFormCategory
+	}
+	return normalized
+}
+
+func itemMetadataVisible(category, metadataCategory string) bool {
+	return normalizeItemFormCategory(category) == strings.ToLower(strings.TrimSpace(metadataCategory))
+}
+
+func containerMetadataVisible(category string, isContainer bool) bool {
+	return isContainer || itemMetadataVisible(category, "container")
 }
 
 func NewServer(service *application.Service) (*Server, error) {
 	funcs := template.FuncMap{
-		"eq": func(a, b any) bool { return fmt.Sprint(a) == fmt.Sprint(b) },
-		"weight": func(value int) string { return domain.FormatWeightHundredths(value) },
-		"gp": func(value int) string { return domain.FormatCopperAsGold(value) },
-		"humanize": func(value any) string { return domain.HumanizeLabel(fmt.Sprint(value)) },
+		"eq":                       func(a, b any) bool { return fmt.Sprint(a) == fmt.Sprint(b) },
+		"weight":                   func(value int) string { return domain.FormatWeightHundredths(value) },
+		"gp":                       func(value int) string { return domain.FormatCopperAsGold(value) },
+		"humanize":                 func(value any) string { return domain.HumanizeLabel(fmt.Sprint(value)) },
+		"itemFormCategory":         normalizeItemFormCategory,
+		"itemMetadataVisible":      itemMetadataVisible,
+		"containerMetadataVisible": containerMetadataVisible,
 		"contains": func(haystack, needle string) bool {
 			return strings.Contains(strings.ToLower(haystack), strings.ToLower(needle))
 		},
@@ -321,12 +342,12 @@ func (s *Server) handleItemNew(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.render(w, "item_form", http.StatusOK, TemplateData{
-		Title:             "Create Item",
-		AppSettings:       settings,
-		AllVaults:         vaults,
-		ContainerOptions:  containers,
-		Categories:        domain.Categories(),
-		Rarities:          domain.Rarities(),
+		Title:                "Create Item",
+		AppSettings:          settings,
+		AllVaults:            vaults,
+		ContainerOptions:     containers,
+		Categories:           domain.Categories(),
+		Rarities:             domain.Rarities(),
 		SelectedLocationKind: string(domain.LocationKindCompendiumRoot),
 	})
 }
@@ -380,17 +401,17 @@ func (s *Server) handleItemDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.render(w, "item_detail", http.StatusOK, TemplateData{
-		Title:                   detail.Item.Name,
-		Notice:                  r.URL.Query().Get("notice"),
-		AppSettings:             detail.Settings,
-		ItemDetail:              detail,
-		Item:                    detail.Item,
-		AllVaults:               vaults,
-		ContainerOptions:        containers,
-		Categories:              domain.Categories(),
-		Rarities:                domain.Rarities(),
-		SelectedLocationKind:    string(detail.Item.Location.Kind),
-		SelectedVaultID:         detail.Item.Location.OwnerVaultID,
+		Title:                     detail.Item.Name,
+		Notice:                    r.URL.Query().Get("notice"),
+		AppSettings:               detail.Settings,
+		ItemDetail:                detail,
+		Item:                      detail.Item,
+		AllVaults:                 vaults,
+		ContainerOptions:          containers,
+		Categories:                domain.Categories(),
+		Rarities:                  domain.Rarities(),
+		SelectedLocationKind:      string(detail.Item.Location.Kind),
+		SelectedVaultID:           detail.Item.Location.OwnerVaultID,
 		SelectedParentContainerID: detail.Item.Location.ParentContainerItemID,
 	})
 }
@@ -473,15 +494,15 @@ func (s *Server) handleBulk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.render(w, "bulk", http.StatusOK, TemplateData{
-		Title:              "Bulk Item Entry",
-		Notice:             r.URL.Query().Get("notice"),
-		AppSettings:        settings,
-		AllVaults:          vaults,
-		ContainerOptions:   containers,
-		Categories:         domain.Categories(),
-		Rarities:           domain.Rarities(),
+		Title:                "Bulk Item Entry",
+		Notice:               r.URL.Query().Get("notice"),
+		AppSettings:          settings,
+		AllVaults:            vaults,
+		ContainerOptions:     containers,
+		Categories:           domain.Categories(),
+		Rarities:             domain.Rarities(),
 		SelectedLocationKind: string(domain.LocationKindCompendiumRoot),
-		BulkDefaultsRarity: string(domain.RarityMundane),
+		BulkDefaultsRarity:   string(domain.RarityMundane),
 	})
 }
 
@@ -526,23 +547,23 @@ func (s *Server) handleBulkPreview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.render(w, "bulk", http.StatusOK, TemplateData{
-		Title:                    "Bulk Item Entry",
-		AppSettings:              settings,
-		AllVaults:                vaults,
-		ContainerOptions:         containers,
-		Categories:               domain.Categories(),
-		Rarities:                 domain.Rarities(),
-		BulkPreview:              preview,
-		EncodedRows:              encoded,
-		BulkText:                 r.FormValue("bulk_text"),
-		SelectedLocationKind:     r.FormValue("location_kind"),
-		SelectedVaultID:          r.FormValue("vault_id"),
+		Title:                     "Bulk Item Entry",
+		AppSettings:               settings,
+		AllVaults:                 vaults,
+		ContainerOptions:          containers,
+		Categories:                domain.Categories(),
+		Rarities:                  domain.Rarities(),
+		BulkPreview:               preview,
+		EncodedRows:               encoded,
+		BulkText:                  r.FormValue("bulk_text"),
+		SelectedLocationKind:      r.FormValue("location_kind"),
+		SelectedVaultID:           r.FormValue("vault_id"),
 		SelectedParentContainerID: r.FormValue("parent_container_item_id"),
-		BulkDefaultsCategory:     r.FormValue("default_category"),
-		BulkDefaultsRarity:       r.FormValue("default_rarity"),
-		BulkDefaultsWeight:       r.FormValue("default_weight_lb"),
-		BulkDefaultsValue:        r.FormValue("default_value_cp"),
-		BulkIsStackable:          r.FormValue("is_stackable") == "on",
+		BulkDefaultsCategory:      r.FormValue("default_category"),
+		BulkDefaultsRarity:        r.FormValue("default_rarity"),
+		BulkDefaultsWeight:        r.FormValue("default_weight_lb"),
+		BulkDefaultsValue:         r.FormValue("default_value_cp"),
+		BulkIsStackable:           r.FormValue("is_stackable") == "on",
 	})
 }
 
@@ -595,14 +616,14 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.render(w, "search", http.StatusOK, TemplateData{
-		Title:       "Search Inventory",
-		Notice:      r.URL.Query().Get("notice"),
-		AppSettings: settings,
+		Title:         "Search Inventory",
+		Notice:        r.URL.Query().Get("notice"),
+		AppSettings:   settings,
 		SearchResults: results,
-		Filters:     filters,
-		AllVaults:   vaults,
-		Categories:  domain.Categories(),
-		Rarities:    domain.Rarities(),
+		Filters:       filters,
+		AllVaults:     vaults,
+		Categories:    domain.Categories(),
+		Rarities:      domain.Rarities(),
 	})
 }
 
@@ -640,21 +661,24 @@ func (s *Server) renderItemFormError(w http.ResponseWriter, r *http.Request, sta
 		return
 	}
 	s.render(w, "item_form", status, TemplateData{
-		Title:                    "Create Item",
-		Error:                    errText,
-		AppSettings:              settings,
-		AllVaults:                vaults,
-		ContainerOptions:         containers,
-		Categories:               domain.Categories(),
-		Rarities:                 domain.Rarities(),
-		Item:                     item,
-		SelectedLocationKind:     string(item.Location.Kind),
-		SelectedVaultID:          item.Location.OwnerVaultID,
+		Title:                     "Create Item",
+		Error:                     errText,
+		AppSettings:               settings,
+		AllVaults:                 vaults,
+		ContainerOptions:          containers,
+		Categories:                domain.Categories(),
+		Rarities:                  domain.Rarities(),
+		Item:                      item,
+		SelectedLocationKind:      string(item.Location.Kind),
+		SelectedVaultID:           item.Location.OwnerVaultID,
 		SelectedParentContainerID: item.Location.ParentContainerItemID,
 	})
 }
 
 func parseItemInput(r *http.Request, existingID string) (application.SaveItemInput, error) {
+	category := r.FormValue("category")
+	isContainer := r.FormValue("is_container") == "on"
+
 	weight, err := domain.ParseWeightHundredths(r.FormValue("weight_lb"))
 	if err != nil {
 		return application.SaveItemInput{}, err
@@ -674,7 +698,7 @@ func parseItemInput(r *http.Request, existingID string) (application.SaveItemInp
 		ParentContainerItemID: strings.TrimSpace(r.FormValue("parent_container_item_id")),
 	}
 
-	details, err := parseItemDetails(r)
+	details, err := parseItemDetails(r, category, isContainer)
 	if err != nil {
 		return application.SaveItemInput{}, err
 	}
@@ -683,13 +707,13 @@ func parseItemInput(r *http.Request, existingID string) (application.SaveItemInp
 		ID:                 existingID,
 		Name:               r.FormValue("name"),
 		Description:        r.FormValue("description"),
-		Category:           r.FormValue("category"),
+		Category:           category,
 		Subcategory:        r.FormValue("subcategory"),
 		Rarity:             domain.ParseRarity(r.FormValue("rarity")),
 		WeightHundredthsLB: weight,
 		BaseValueCP:        value,
 		Quantity:           quantity,
-		IsContainer:        r.FormValue("is_container") == "on",
+		IsContainer:        isContainer,
 		IsStackable:        r.FormValue("is_stackable") == "on",
 		IsEquipped:         r.FormValue("is_equipped") == "on",
 		IsMagical:          r.FormValue("is_magical") == "on",
@@ -700,18 +724,22 @@ func parseItemInput(r *http.Request, existingID string) (application.SaveItemInp
 	}, nil
 }
 
-func parseItemDetails(r *http.Request) (domain.ItemDetails, error) {
+func parseItemDetails(r *http.Request, category string, isContainer bool) (domain.ItemDetails, error) {
 	var details domain.ItemDetails
+	activeCategory := strings.ToLower(strings.TrimSpace(category))
 
-	containerWeight, err := domain.ParseWeightHundredths(r.FormValue("container_max_weight_lb"))
-	if err != nil {
-		return domain.ItemDetails{}, err
-	}
-	if containerWeight > 0 {
-		details.Container = &domain.ContainerDetails{MaxWeightHundredthsLB: containerWeight}
+	if isContainer || activeCategory == "container" {
+		containerWeight, err := domain.ParseWeightHundredths(r.FormValue("container_max_weight_lb"))
+		if err != nil {
+			return domain.ItemDetails{}, err
+		}
+		if containerWeight > 0 {
+			details.Container = &domain.ContainerDetails{MaxWeightHundredthsLB: containerWeight}
+		}
 	}
 
-	if armorCategory := strings.TrimSpace(r.FormValue("armor_category")); armorCategory != "" {
+	if activeCategory == "armor" {
+		armorCategory := strings.TrimSpace(r.FormValue("armor_category"))
 		baseAC, err := parseIntField(r.FormValue("armor_base_ac"))
 		if err != nil {
 			return domain.ItemDetails{}, err
@@ -720,16 +748,19 @@ func parseItemDetails(r *http.Request) (domain.ItemDetails, error) {
 		if err != nil {
 			return domain.ItemDetails{}, err
 		}
-		details.Armor = &domain.ArmorDetails{
-			ArmorCategory:       armorCategory,
-			BaseAC:              baseAC,
-			DexModifierBehavior: r.FormValue("armor_dex_behavior"),
-			StrengthRequirement: strReq,
-			StealthDisadvantage: r.FormValue("armor_stealth_disadvantage") == "on",
+		if armorCategory != "" {
+			details.Armor = &domain.ArmorDetails{
+				ArmorCategory:       armorCategory,
+				BaseAC:              baseAC,
+				DexModifierBehavior: r.FormValue("armor_dex_behavior"),
+				StrengthRequirement: strReq,
+				StealthDisadvantage: r.FormValue("armor_stealth_disadvantage") == "on",
+			}
 		}
 	}
 
-	if weaponClass := strings.TrimSpace(r.FormValue("weapon_class")); weaponClass != "" {
+	if activeCategory == "weapon" {
+		weaponClass := strings.TrimSpace(r.FormValue("weapon_class"))
 		normalRange, err := parseIntField(r.FormValue("weapon_normal_range"))
 		if err != nil {
 			return domain.ItemDetails{}, err
@@ -745,24 +776,29 @@ func parseItemDetails(r *http.Request) (domain.ItemDetails, error) {
 				properties = append(properties, property)
 			}
 		}
-		details.Weapon = &domain.WeaponDetails{
-			WeaponClass: weaponClass,
-			DamageDice:  r.FormValue("weapon_damage_dice"),
-			DamageType:  r.FormValue("weapon_damage_type"),
-			Properties:  properties,
-			NormalRange: normalRange,
-			LongRange:   longRange,
+		if weaponClass != "" {
+			details.Weapon = &domain.WeaponDetails{
+				WeaponClass: weaponClass,
+				DamageDice:  r.FormValue("weapon_damage_dice"),
+				DamageType:  r.FormValue("weapon_damage_type"),
+				Properties:  properties,
+				NormalRange: normalRange,
+				LongRange:   longRange,
+			}
 		}
 	}
 
-	if toolCategory := strings.TrimSpace(r.FormValue("tool_category")); toolCategory != "" {
-		details.Tool = &domain.ToolDetails{
-			ToolCategory:     toolCategory,
-			ProficiencyNotes: r.FormValue("tool_proficiency_notes"),
+	if activeCategory == "tool" {
+		if toolCategory := strings.TrimSpace(r.FormValue("tool_category")); toolCategory != "" {
+			details.Tool = &domain.ToolDetails{
+				ToolCategory:     toolCategory,
+				ProficiencyNotes: r.FormValue("tool_proficiency_notes"),
+			}
 		}
 	}
 
-	if mountType := strings.TrimSpace(r.FormValue("mount_type")); mountType != "" {
+	if activeCategory == "mount" {
+		mountType := strings.TrimSpace(r.FormValue("mount_type"))
 		speed, err := parseIntField(r.FormValue("mount_speed"))
 		if err != nil {
 			return domain.ItemDetails{}, err
@@ -771,14 +807,17 @@ func parseItemDetails(r *http.Request) (domain.ItemDetails, error) {
 		if err != nil {
 			return domain.ItemDetails{}, err
 		}
-		details.Mount = &domain.MountDetails{
-			MountType:                   mountType,
-			MovementSpeed:               speed,
-			CarryingCapacityHundredthsLB: carryWeight,
+		if mountType != "" {
+			details.Mount = &domain.MountDetails{
+				MountType:                    mountType,
+				MovementSpeed:                speed,
+				CarryingCapacityHundredthsLB: carryWeight,
+			}
 		}
 	}
 
-	if vehicleType := strings.TrimSpace(r.FormValue("vehicle_type")); vehicleType != "" {
+	if activeCategory == "vehicle" {
+		vehicleType := strings.TrimSpace(r.FormValue("vehicle_type"))
 		speed, err := parseIntField(r.FormValue("vehicle_speed"))
 		if err != nil {
 			return domain.ItemDetails{}, err
@@ -787,15 +826,19 @@ func parseItemDetails(r *http.Request) (domain.ItemDetails, error) {
 		if err != nil {
 			return domain.ItemDetails{}, err
 		}
-		details.Vehicle = &domain.VehicleDetails{
-			VehicleType:                 vehicleType,
-			MovementSpeed:               speed,
-			CarryingCapacityHundredthsLB: carryWeight,
+		if vehicleType != "" {
+			details.Vehicle = &domain.VehicleDetails{
+				VehicleType:                  vehicleType,
+				MovementSpeed:                speed,
+				CarryingCapacityHundredthsLB: carryWeight,
+			}
 		}
 	}
 
-	if treasureKind := strings.TrimSpace(r.FormValue("treasure_kind")); treasureKind != "" {
-		details.Treasure = &domain.TreasureDetails{TreasureKind: treasureKind}
+	if activeCategory == "treasure" {
+		if treasureKind := strings.TrimSpace(r.FormValue("treasure_kind")); treasureKind != "" {
+			details.Treasure = &domain.TreasureDetails{TreasureKind: treasureKind}
+		}
 	}
 
 	return details, nil
