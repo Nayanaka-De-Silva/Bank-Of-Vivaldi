@@ -49,6 +49,12 @@ func TestItemFormFieldsDefaultCategorySelection(t *testing.T) {
 	if !strings.Contains(html, `<option value="equipment" selected>`) {
 		t.Fatalf("expected equipment to be selected by default, got:\n%s", html)
 	}
+	if !strings.Contains(html, `data-metadata-section hidden`) {
+		t.Fatalf("expected specialized metadata section to be hidden when no metadata applies, got:\n%s", html)
+	}
+	if strings.Contains(html, `No specialized metadata fields are needed for the selected category.`) {
+		t.Fatalf("expected empty metadata helper copy to be removed, got:\n%s", html)
+	}
 }
 
 func TestItemFormFieldsShowOnlyMatchingMetadataGroup(t *testing.T) {
@@ -71,6 +77,9 @@ func TestItemFormFieldsShowOnlyMatchingMetadataGroup(t *testing.T) {
 	}
 
 	html := rendered.String()
+	if strings.Contains(html, `data-metadata-section hidden`) {
+		t.Fatalf("expected specialized metadata section to be visible for matching metadata, got:\n%s", html)
+	}
 	if !strings.Contains(html, `data-metadata-group="weapon"`) {
 		t.Fatalf("expected weapon metadata group in markup, got:\n%s", html)
 	}
@@ -82,6 +91,9 @@ func TestItemFormFieldsShowOnlyMatchingMetadataGroup(t *testing.T) {
 	}
 	if !strings.Contains(html, `input.disabled = !visible;`) {
 		t.Fatalf("expected inactive metadata inputs to be disabled in the visibility script, got:\n%s", html)
+	}
+	if !strings.Contains(html, `metadataSection.hidden = !hasVisibleGroup;`) {
+		t.Fatalf("expected specialized metadata section visibility to track active groups, got:\n%s", html)
 	}
 }
 
@@ -105,6 +117,9 @@ func TestItemFormFieldsKeepContainerMetadataVisibleForContainerItems(t *testing.
 	}
 
 	html := rendered.String()
+	if strings.Contains(html, `data-metadata-section hidden`) {
+		t.Fatalf("expected specialized metadata section to stay visible for container items, got:\n%s", html)
+	}
 	if strings.Contains(html, `data-metadata-group="container" hidden`) {
 		t.Fatalf("expected container metadata group to stay visible for container items, got:\n%s", html)
 	}
