@@ -5,6 +5,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -122,6 +125,29 @@ func TestItemFormFieldsKeepContainerMetadataVisibleForContainerItems(t *testing.
 	}
 	if strings.Contains(html, `data-metadata-group="container" hidden`) {
 		t.Fatalf("expected container metadata group to stay visible for container items, got:\n%s", html)
+	}
+}
+
+func TestStylesheetPreservesHiddenAttribute(t *testing.T) {
+	t.Parallel()
+
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatalf("resolve current file path")
+	}
+
+	stylesheetPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "web", "static", "styles.css")
+	css, err := os.ReadFile(stylesheetPath)
+	if err != nil {
+		t.Fatalf("read stylesheet: %v", err)
+	}
+
+	stylesheet := string(css)
+	if !strings.Contains(stylesheet, "[hidden] {") {
+		t.Fatalf("expected stylesheet to define a hidden attribute rule")
+	}
+	if !strings.Contains(stylesheet, "display: none !important;") {
+		t.Fatalf("expected hidden attribute rule to force display none")
 	}
 }
 
