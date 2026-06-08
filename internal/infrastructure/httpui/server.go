@@ -46,7 +46,7 @@ type TemplateData struct {
 	BulkDefaultsCategory      string
 	BulkDefaultsRarity        string
 	BulkDefaultsWeight        string
-	BulkDefaultsValue         string
+	BulkDefaultsValue         int
 	BulkIsStackable           bool
 }
 
@@ -73,6 +73,7 @@ func NewServer(service *application.Service) (*Server, error) {
 		"eq":                       func(a, b any) bool { return fmt.Sprint(a) == fmt.Sprint(b) },
 		"weight":                   func(value int) string { return domain.FormatWeightHundredths(value) },
 		"gp":                       func(value int) string { return domain.FormatCopperAsGold(value) },
+			"breakdownCP":              domain.BreakdownCP,
 		"humanize":                 func(value any) string { return domain.HumanizeLabel(fmt.Sprint(value)) },
 		"itemFormCategory":         normalizeItemFormCategory,
 		"itemMetadataVisible":      itemMetadataVisible,
@@ -528,7 +529,7 @@ func (s *Server) handleBulkPreview(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	value, err := parseIntField(r.FormValue("default_value_cp"))
+	value, err := parseCoinValue(r, "default_")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -562,7 +563,7 @@ func (s *Server) handleBulkPreview(w http.ResponseWriter, r *http.Request) {
 		BulkDefaultsCategory:      r.FormValue("default_category"),
 		BulkDefaultsRarity:        r.FormValue("default_rarity"),
 		BulkDefaultsWeight:        r.FormValue("default_weight_lb"),
-		BulkDefaultsValue:         r.FormValue("default_value_cp"),
+		BulkDefaultsValue:         value,
 		BulkIsStackable:           r.FormValue("is_stackable") == "on",
 	})
 }
@@ -683,7 +684,7 @@ func parseItemInput(r *http.Request, existingID string) (application.SaveItemInp
 	if err != nil {
 		return application.SaveItemInput{}, err
 	}
-	value, err := parseIntField(r.FormValue("base_value_cp"))
+	value, err := parseCoinValue(r, "value_")
 	if err != nil {
 		return application.SaveItemInput{}, err
 	}
@@ -866,6 +867,32 @@ func parsePurse(r *http.Request) (domain.Purse, error) {
 		return domain.Purse{}, err
 	}
 	return domain.Purse{CP: cp, SP: sp, EP: ep, GP: gp, PP: pp}, nil
+}
+
+// parseCoinValue reads multi-denomination coin inputs (prefix+pp/gp/ep/sp/cp)
+// and returns the total in copper pieces.
+func parseCoinValue(r *http.Request, prefix string) (int, error) {
+	pp, err := parseIntField(r.FormValue(prefix + "pp"))
+	if err != nil {
+		return 0, err
+	}
+	gp, err := parseIntField(r.FormValue(prefix + "gp"))
+	if err != nil {
+		return 0, err
+	}
+	ep, err := parseIntField(r.FormValue(prefix + "ep"))
+	if err != nil {
+		return 0, err
+	}
+	sp, err := parseIntField(r.FormValue(prefix + "sp"))
+	if err != nil {
+		return 0, err
+	}
+	cp, err := parseIntField(r.FormValue(prefix + "cp"))
+	if err != nil {
+		return 0, err
+	}
+	return (pp * 1000) + (gp * 100) + (ep * 50) + (sp * 10) + cp, nil
 }
 
 func parseIntField(value string) (int, error) {
