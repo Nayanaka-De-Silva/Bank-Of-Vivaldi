@@ -26,7 +26,18 @@
           </select>
         </label>
         <label>Default weight (lb) <input type="text" name="default_weight_lb" value="{{.BulkDefaultsWeight}}"></label>
-        <label>Default value (cp) <input type="number" name="default_value_cp" value="{{.BulkDefaultsValue}}"></label>
+        <fieldset>
+          <legend>Default value</legend>
+          {{with breakdownCP .BulkDefaultsValue}}
+          <div class="grid five">
+            <label>pp <input type="number" name="default_pp" value="{{.PP}}" min="0"></label>
+            <label>gp <input type="number" name="default_gp" value="{{.GP}}" min="0"></label>
+            <label>ep <input type="number" name="default_ep" value="{{.EP}}" min="0"></label>
+            <label>sp <input type="number" name="default_sp" value="{{.SP}}" min="0"></label>
+            <label>cp <input type="number" name="default_cp" value="{{.CP}}" min="0"></label>
+          </div>
+          {{end}}
+        </fieldset>
       </div>
       <div class="grid three">
         <label>Location kind

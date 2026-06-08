@@ -38,7 +38,18 @@
     </select>
   </label>
   <label>Weight (lb) <input type="text" name="weight_lb" value="{{weight .Item.WeightHundredthsLB}}"></label>
-  <label>Base value (cp) <input type="number" name="base_value_cp" value="{{.Item.BaseValueCP}}"></label>
+  <fieldset>
+    <legend>Base value</legend>
+    {{with breakdownCP .Item.BaseValueCP}}
+    <div class="grid five">
+      <label>pp <input type="number" name="value_pp" value="{{.PP}}" min="0"></label>
+      <label>gp <input type="number" name="value_gp" value="{{.GP}}" min="0"></label>
+      <label>ep <input type="number" name="value_ep" value="{{.EP}}" min="0"></label>
+      <label>sp <input type="number" name="value_sp" value="{{.SP}}" min="0"></label>
+      <label>cp <input type="number" name="value_cp" value="{{.CP}}" min="0"></label>
+    </div>
+    {{end}}
+  </fieldset>
   <label>Quantity <input type="number" name="quantity" min="1" value="{{if .Item.Quantity}}{{.Item.Quantity}}{{else}}1{{end}}"></label>
   <label>Source kind
     <select name="source_kind">

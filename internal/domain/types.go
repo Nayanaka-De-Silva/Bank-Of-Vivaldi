@@ -366,6 +366,23 @@ func FormatWeightHundredths(value int) string {
 	return fmt.Sprintf("%s%d.%02d", sign, whole, fraction)
 }
 
+// CoinBreakdown holds a copper-piece total split into denominations.
+type CoinBreakdown struct{ PP, GP, EP, SP, CP int }
+
+// BreakdownCP converts a copper-piece total into its denomination breakdown
+// using the standard 5e conversion rates (1 PP=1000, 1 GP=100, 1 EP=50, 1 SP=10).
+func BreakdownCP(value int) CoinBreakdown {
+	pp := value / 1000
+	value %= 1000
+	gp := value / 100
+	value %= 100
+	ep := value / 50
+	value %= 50
+	sp := value / 10
+	cp := value % 10
+	return CoinBreakdown{PP: pp, GP: gp, EP: ep, SP: sp, CP: cp}
+}
+
 func FormatCopperAsGold(valueCP int) string {
 	sign := ""
 	if valueCP < 0 {
