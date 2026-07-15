@@ -50,3 +50,52 @@ func TestHumanizeLabel(t *testing.T) {
 		}
 	}
 }
+
+func TestWeaponCategories(t *testing.T) {
+	want := []string{"simple-melee", "simple-ranged", "martial-melee", "martial-ranged"}
+	got := WeaponCategories()
+
+	if len(got) != len(want) {
+		t.Fatalf("WeaponCategories() returned %d categories, want %d", len(got), len(want))
+	}
+	for i, category := range want {
+		if got[i] != category {
+			t.Fatalf("WeaponCategories()[%d] = %q, want %q", i, got[i], category)
+		}
+	}
+}
+
+func TestIsValidWeaponCategory(t *testing.T) {
+	tests := map[string]bool{
+		"simple-melee":   true,
+		"simple-ranged":  true,
+		"martial-melee":  true,
+		"martial-ranged": true,
+		"":               false,
+		"martial":        false,
+		"ranged":         false,
+		"Simple Melee":   false,
+	}
+
+	for input, want := range tests {
+		if got := IsValidWeaponCategory(input); got != want {
+			t.Fatalf("IsValidWeaponCategory(%q) = %v, want %v", input, got, want)
+		}
+	}
+}
+
+func TestIsRangedWeaponCategory(t *testing.T) {
+	tests := map[string]bool{
+		"simple-ranged":  true,
+		"martial-ranged": true,
+		"simple-melee":   false,
+		"martial-melee":  false,
+		"":               false,
+	}
+
+	for input, want := range tests {
+		if got := IsRangedWeaponCategory(input); got != want {
+			t.Fatalf("IsRangedWeaponCategory(%q) = %v, want %v", input, got, want)
+		}
+	}
+}

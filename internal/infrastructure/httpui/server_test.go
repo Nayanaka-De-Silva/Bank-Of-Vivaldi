@@ -211,6 +211,83 @@ func TestParseItemDetailsKeepsContainerMetadataForContainerItems(t *testing.T) {
 	}
 }
 
+func TestParseItemDetailsParsesValidWeaponCategory(t *testing.T) {
+	t.Parallel()
+
+	form := url.Values{
+		"weapon_class":        {"martial-ranged"},
+		"weapon_damage_dice":  {"1d8"},
+		"weapon_damage_type":  {"piercing"},
+		"weapon_properties":   {"ammunition, heavy, two-handed"},
+		"weapon_normal_range": {"150"},
+		"weapon_long_range":   {"600"},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/items", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := req.ParseForm(); err != nil {
+		t.Fatalf("parse form: %v", err)
+	}
+
+	details, err := parseItemDetails(req, "weapon", false)
+	if err != nil {
+		t.Fatalf("parse item details: %v", err)
+	}
+
+	if details.Weapon == nil {
+		t.Fatalf("expected weapon metadata to be parsed for a valid weapon category")
+	}
+	if details.Weapon.WeaponClass != "martial-ranged" {
+		t.Fatalf("weapon class = %q, want %q", details.Weapon.WeaponClass, "martial-ranged")
+	}
+	if details.Weapon.NormalRange != 150 || details.Weapon.LongRange != 600 {
+		t.Fatalf("weapon ranges = %d/%d, want 150/600", details.Weapon.NormalRange, details.Weapon.LongRange)
+	}
+}
+
+func TestParseItemDetailsRejectsInvalidWeaponCategory(t *testing.T) {
+	t.Parallel()
+
+	// "martial" is not one of the four allowed categories; the dropdown can be
+	// bypassed, so the server must reject it.
+	form := url.Values{
+		"weapon_class": {"martial"},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/items", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := req.ParseForm(); err != nil {
+		t.Fatalf("parse form: %v", err)
+	}
+
+	if _, err := parseItemDetails(req, "weapon", false); err == nil {
+		t.Fatalf("expected an error for an invalid weapon category")
+	}
+}
+
+func TestParseItemDetailsAllowsEmptyWeaponCategory(t *testing.T) {
+	t.Parallel()
+
+	// An empty weapon category means "not set" and must simply produce no weapon details.
+	form := url.Values{
+		"weapon_class": {""},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/items", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := req.ParseForm(); err != nil {
+		t.Fatalf("parse form: %v", err)
+	}
+
+	details, err := parseItemDetails(req, "weapon", false)
+	if err != nil {
+		t.Fatalf("parse item details: %v", err)
+	}
+	if details.Weapon != nil {
+		t.Fatalf("expected no weapon metadata when the category is empty")
+	}
+}
+
 func TestItemFormLocationCompendiumKindDisablesBothSelects(t *testing.T) {
 	t.Parallel()
 
@@ -341,5 +418,70 @@ func TestItemFormLocationScriptContainsSyncLogic(t *testing.T) {
 	}
 	if !strings.Contains(html, `vaultSelect.addEventListener`) {
 		t.Fatalf("expected location sync script to listen on vault_id changes, got:\n%s", html)
+	}
+}
+
+func TestItemFormWeaponCategoryRendersFourOptions(t *testing.T) {
+	t.Parallel()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	var rendered bytes.Buffer
+	err = server.tmpl.ExecuteTemplate(&rendered, "item_form_fields", TemplateData{
+		Categories: domain.Categories(),
+		Rarities:   domain.Rarities(),
+	})
+	if err != nil {
+		t.Fatalf("render item form fields: %v", err)
+	}
+
+	html := rendered.String()
+	if !strings.Contains(html, `<select name="weapon_class">`) {
+		t.Fatalf("expected weapon category to render as a select, got:\n%s", html)
+	}
+	for _, category := range domain.WeaponCategories() {
+		option := `<option value="` + category + `"`
+		if !strings.Contains(html, option) {
+			t.Fatalf("expected weapon category option %q to be rendered, got:\n%s", category, html)
+		}
+		if label := domain.HumanizeLabel(category); !strings.Contains(html, label) {
+			t.Fatalf("expected weapon category label %q to be rendered, got:\n%s", label, html)
+		}
+	}
+	if !strings.Contains(html, `data-weapon-range-fields`) {
+		t.Fatalf("expected a toggleable range-fields container, got:\n%s", html)
+	}
+	if !strings.Contains(html, `weaponClassSelect.addEventListener`) {
+		t.Fatalf("expected weapon range script to listen on weapon category changes, got:\n%s", html)
+	}
+}
+
+func TestItemFormWeaponCategoryMarksSavedSelection(t *testing.T) {
+	t.Parallel()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	item := domain.Item{Category: "weapon"}
+	item.Details.Weapon = &domain.WeaponDetails{WeaponClass: "martial-ranged"}
+
+	var rendered bytes.Buffer
+	err = server.tmpl.ExecuteTemplate(&rendered, "item_form_fields", TemplateData{
+		Categories: domain.Categories(),
+		Rarities:   domain.Rarities(),
+		Item:       item,
+	})
+	if err != nil {
+		t.Fatalf("render item form fields: %v", err)
+	}
+
+	html := rendered.String()
+	if !strings.Contains(html, `<option value="martial-ranged" selected>`) {
+		t.Fatalf("expected the saved weapon category to be pre-selected, got:\n%s", html)
 	}
 }

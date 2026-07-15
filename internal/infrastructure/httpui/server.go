@@ -76,6 +76,7 @@ func NewServer(service *application.Service) (*Server, error) {
 			"breakdownCP":              domain.BreakdownCP,
 		"humanize":                 func(value any) string { return domain.HumanizeLabel(fmt.Sprint(value)) },
 		"itemFormCategory":         normalizeItemFormCategory,
+		"weaponCategories":         domain.WeaponCategories,
 		"itemMetadataVisible":      itemMetadataVisible,
 		"containerMetadataVisible": containerMetadataVisible,
 		"contains": func(haystack, needle string) bool {
@@ -762,6 +763,10 @@ func parseItemDetails(r *http.Request, category string, isContainer bool) (domai
 
 	if activeCategory == "weapon" {
 		weaponClass := strings.TrimSpace(r.FormValue("weapon_class"))
+		// Enforce the four-option constraint server-side; the dropdown alone can be bypassed.
+		if weaponClass != "" && !domain.IsValidWeaponCategory(weaponClass) {
+			return domain.ItemDetails{}, fmt.Errorf("invalid weapon category %q", weaponClass)
+		}
 		normalRange, err := parseIntField(r.FormValue("weapon_normal_range"))
 		if err != nil {
 			return domain.ItemDetails{}, err

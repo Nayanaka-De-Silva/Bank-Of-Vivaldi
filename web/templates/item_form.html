@@ -20,6 +20,7 @@
 {{ $showVehicle := itemMetadataVisible $selectedCategory "vehicle" }}
 {{ $showTreasure := itemMetadataVisible $selectedCategory "treasure" }}
 {{ $hasVisibleMetadata := or $showContainer $showArmor $showWeapon $showTool $showMount $showVehicle $showTreasure }}
+{{ $selectedWeaponClass := "" }}{{ with .Item.Details.Weapon }}{{ $selectedWeaponClass = .WeaponClass }}{{ end }}
 <div class="grid two">
   <label>Name <input type="text" name="name" value="{{.Item.Name}}" required></label>
   <label>Category
@@ -133,10 +134,9 @@
       <label>Weapon category
         <select name="weapon_class">
           <option value="">--</option>
-          <option value="simple-melee" {{with .Item.Details.Weapon}}{{if eq .WeaponClass "simple-melee"}}selected{{end}}{{end}}>Simple Melee</option>
-          <option value="simple-ranged" {{with .Item.Details.Weapon}}{{if eq .WeaponClass "simple-ranged"}}selected{{end}}{{end}}>Simple Ranged</option>
-          <option value="martial-melee" {{with .Item.Details.Weapon}}{{if eq .WeaponClass "martial-melee"}}selected{{end}}{{end}}>Martial Melee</option>
-          <option value="martial-ranged" {{with .Item.Details.Weapon}}{{if eq .WeaponClass "martial-ranged"}}selected{{end}}{{end}}>Martial Ranged</option>
+          {{range weaponCategories}}
+            <option value="{{.}}" {{if eq $selectedWeaponClass .}}selected{{end}}>{{humanize .}}</option>
+          {{end}}
         </select>
       </label>
       <label>Weapon damage dice

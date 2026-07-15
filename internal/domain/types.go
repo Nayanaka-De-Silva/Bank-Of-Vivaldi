@@ -275,6 +275,33 @@ func Categories() []string {
 	}
 }
 
+// WeaponCategories lists the only valid D&D 5e weapon categories: the four
+// combinations of proficiency tier (simple/martial) and range type (melee/ranged).
+func WeaponCategories() []string {
+	return []string{
+		"simple-melee",
+		"simple-ranged",
+		"martial-melee",
+		"martial-ranged",
+	}
+}
+
+// IsValidWeaponCategory reports whether value is one of the four allowed weapon categories.
+func IsValidWeaponCategory(value string) bool {
+	for _, category := range WeaponCategories() {
+		if value == category {
+			return true
+		}
+	}
+	return false
+}
+
+// IsRangedWeaponCategory reports whether the category is a ranged one, which
+// governs whether normal/long range values are meaningful for the weapon.
+func IsRangedWeaponCategory(value string) bool {
+	return value == "simple-ranged" || value == "martial-ranged"
+}
+
 func Rarities() []string {
 	return []string{
 		string(RarityMundane),
