@@ -130,8 +130,14 @@
   <section class="metadata-group stack" data-metadata-group="weapon" {{if not $showWeapon}}hidden{{end}}>
     <h3>Weapon metadata</h3>
     <div class="grid two">
-      <label>Weapon class
-        <input type="text" name="weapon_class" value="{{with .Item.Details.Weapon}}{{.WeaponClass}}{{end}}">
+      <label>Weapon category
+        <select name="weapon_class">
+          <option value="">--</option>
+          <option value="simple-melee" {{with .Item.Details.Weapon}}{{if eq .WeaponClass "simple-melee"}}selected{{end}}{{end}}>Simple Melee</option>
+          <option value="simple-ranged" {{with .Item.Details.Weapon}}{{if eq .WeaponClass "simple-ranged"}}selected{{end}}{{end}}>Simple Ranged</option>
+          <option value="martial-melee" {{with .Item.Details.Weapon}}{{if eq .WeaponClass "martial-melee"}}selected{{end}}{{end}}>Martial Melee</option>
+          <option value="martial-ranged" {{with .Item.Details.Weapon}}{{if eq .WeaponClass "martial-ranged"}}selected{{end}}{{end}}>Martial Ranged</option>
+        </select>
       </label>
       <label>Weapon damage dice
         <input type="text" name="weapon_damage_dice" value="{{with .Item.Details.Weapon}}{{.DamageDice}}{{end}}">
@@ -142,6 +148,8 @@
       <label>Weapon properties
         <input type="text" name="weapon_properties" value="{{with .Item.Details.Weapon}}{{range $index, $value := .Properties}}{{if $index}}, {{end}}{{$value}}{{end}}{{end}}">
       </label>
+    </div>
+    <div class="grid two" data-weapon-range-fields>
       <label>Weapon normal range
         <input type="number" name="weapon_normal_range" value="{{with .Item.Details.Weapon}}{{.NormalRange}}{{end}}">
       </label>
@@ -289,6 +297,49 @@
   locationKindSelect.addEventListener("change", syncLocationFields);
   vaultSelect.addEventListener("change", syncLocationFields);
   syncLocationFields();
+})();
+</script>
+
+<script>
+(() => {
+  const form = document.currentScript.closest("form");
+  if (!form) return;
+
+  const weaponGroup = form.querySelector('[data-metadata-group="weapon"]');
+  const weaponClassSelect = form.querySelector('select[name="weapon_class"]');
+  const propertiesInput = form.querySelector('input[name="weapon_properties"]');
+  const rangeFields = form.querySelector("[data-weapon-range-fields]");
+  if (!weaponGroup || !weaponClassSelect || !rangeFields) return;
+
+  const rangeInputs = Array.from(rangeFields.querySelectorAll("input"));
+
+  const syncWeaponRangeFields = () => {
+    // Skip while the weapon group is hidden; the category script already disabled its inputs.
+    if (weaponGroup.hidden) return;
+
+    // Ranged weapons and thrown weapons are the only ones that use range values.
+    const isRanged = weaponClassSelect.value.includes("ranged");
+    const hasThrown = propertiesInput
+      ? propertiesInput.value.split(",").some((p) => p.trim().toLowerCase() === "thrown")
+      : false;
+    const show = isRanged || hasThrown;
+
+    rangeFields.hidden = !show;
+    rangeInputs.forEach((input) => {
+      input.disabled = !show;
+    });
+  };
+
+  weaponClassSelect.addEventListener("change", syncWeaponRangeFields);
+  if (propertiesInput) {
+    propertiesInput.addEventListener("input", syncWeaponRangeFields);
+  }
+  // Re-run after the category script toggles the weapon group so hidden ranges stay disabled.
+  const categorySelect = form.querySelector('select[name="category"]');
+  if (categorySelect) {
+    categorySelect.addEventListener("change", syncWeaponRangeFields);
+  }
+  syncWeaponRangeFields();
 })();
 </script>
 {{end}}
