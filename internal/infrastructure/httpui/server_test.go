@@ -210,3 +210,136 @@ func TestParseItemDetailsKeepsContainerMetadataForContainerItems(t *testing.T) {
 		t.Fatalf("expected container metadata to be preserved for container items")
 	}
 }
+
+func TestItemFormLocationCompendiumKindDisablesBothSelects(t *testing.T) {
+	t.Parallel()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	var rendered bytes.Buffer
+	err = server.tmpl.ExecuteTemplate(&rendered, "item_form_fields", TemplateData{
+		Categories:           domain.Categories(),
+		Rarities:             domain.Rarities(),
+		SelectedLocationKind: string(domain.LocationKindCompendiumRoot),
+	})
+	if err != nil {
+		t.Fatalf("render item form fields: %v", err)
+	}
+
+	html := rendered.String()
+	if !strings.Contains(html, `name="vault_id" disabled`) {
+		t.Fatalf("expected vault_id select to be disabled for compendium location kind, got:\n%s", html)
+	}
+	if !strings.Contains(html, `name="parent_container_item_id" disabled`) {
+		t.Fatalf("expected parent_container_item_id select to be disabled for compendium location kind, got:\n%s", html)
+	}
+}
+
+func TestItemFormLocationVaultKindDisablesOnlyContainerSelect(t *testing.T) {
+	t.Parallel()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	var rendered bytes.Buffer
+	err = server.tmpl.ExecuteTemplate(&rendered, "item_form_fields", TemplateData{
+		Categories:           domain.Categories(),
+		Rarities:             domain.Rarities(),
+		SelectedLocationKind: string(domain.LocationKindVaultRoot),
+		AllVaults:            []domain.Vault{{ID: "vault-1", CharacterName: "Aragorn"}},
+		SelectedVaultID:      "vault-1",
+	})
+	if err != nil {
+		t.Fatalf("render item form fields: %v", err)
+	}
+
+	html := rendered.String()
+	if strings.Contains(html, `name="vault_id" disabled`) {
+		t.Fatalf("expected vault_id select to be enabled for vault location kind, got:\n%s", html)
+	}
+	if !strings.Contains(html, `name="parent_container_item_id" disabled`) {
+		t.Fatalf("expected parent_container_item_id select to be disabled for vault location kind, got:\n%s", html)
+	}
+}
+
+func TestItemFormLocationContainerKindFiltersByVault(t *testing.T) {
+	t.Parallel()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	var rendered bytes.Buffer
+	err = server.tmpl.ExecuteTemplate(&rendered, "item_form_fields", TemplateData{
+		Categories:           domain.Categories(),
+		Rarities:             domain.Rarities(),
+		SelectedLocationKind: string(domain.LocationKindContainer),
+		SelectedVaultID:      "vault-1",
+		AllVaults: []domain.Vault{
+			{ID: "vault-1", CharacterName: "Aragorn"},
+			{ID: "vault-2", CharacterName: "Legolas"},
+		},
+		ContainerOptions: []domain.Item{
+			{ID: "c1", Name: "Chest", Location: domain.ItemLocation{OwnerVaultID: "vault-1"}},
+			{ID: "c2", Name: "Bag", Location: domain.ItemLocation{OwnerVaultID: "vault-2"}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("render item form fields: %v", err)
+	}
+
+	html := rendered.String()
+	if !strings.Contains(html, `data-vault-id="vault-1"`) {
+		t.Fatalf("expected container options to carry data-vault-id attribute, got:\n%s", html)
+	}
+	if !strings.Contains(html, `data-vault-id="vault-2"`) {
+		t.Fatalf("expected all container options to carry data-vault-id attribute, got:\n%s", html)
+	}
+	// Matching-vault container (vault-1) must not be hidden.
+	if strings.Contains(html, `data-vault-id="vault-1" hidden`) {
+		t.Fatalf("expected vault-1 container option to be visible, got:\n%s", html)
+	}
+	// Non-matching container (vault-2) must be hidden and disabled.
+	if !strings.Contains(html, `data-vault-id="vault-2" hidden disabled`) {
+		t.Fatalf("expected non-matching vault-2 container option to be hidden and disabled, got:\n%s", html)
+	}
+}
+
+func TestItemFormLocationScriptContainsSyncLogic(t *testing.T) {
+	t.Parallel()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	var rendered bytes.Buffer
+	err = server.tmpl.ExecuteTemplate(&rendered, "item_form_fields", TemplateData{
+		Categories:           domain.Categories(),
+		Rarities:             domain.Rarities(),
+		SelectedLocationKind: string(domain.LocationKindCompendiumRoot),
+	})
+	if err != nil {
+		t.Fatalf("render item form fields: %v", err)
+	}
+
+	html := rendered.String()
+	if !strings.Contains(html, `option.dataset.vaultId`) {
+		t.Fatalf("expected location sync script to reference option.dataset.vaultId, got:\n%s", html)
+	}
+	if !strings.Contains(html, `syncLocationFields`) {
+		t.Fatalf("expected location sync script to define syncLocationFields, got:\n%s", html)
+	}
+	if !strings.Contains(html, `locationKindSelect.addEventListener`) {
+		t.Fatalf("expected location sync script to listen on location_kind changes, got:\n%s", html)
+	}
+	if !strings.Contains(html, `vaultSelect.addEventListener`) {
+		t.Fatalf("expected location sync script to listen on vault_id changes, got:\n%s", html)
+	}
+}
