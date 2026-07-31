@@ -57,6 +57,29 @@ func BulkAttributeKeys() []string {
 	}
 }
 
+// reconcileVersatileProperty guarantees that a row carrying a versatile damage
+// die also carries the "versatile" property. A die without the property is
+// incoherent — the item form only reveals the versatile input while that
+// property is checked, so such a die would be invisible in the form and
+// silently dropped by the next save. Bulk import is the only way to reach that
+// state, so it is repaired here rather than rejected: specifying a versatile
+// die is an unambiguous statement that the weapon is versatile.
+//
+// This runs after the whole segment loop rather than inside the versatile case
+// because "props=" assigns the properties slice wholesale, so an earlier
+// versatile= could otherwise be undone by a later props= on the same line.
+func reconcileVersatileProperty(row *BulkPreviewRow) {
+	if row.Details.Weapon == nil || row.Details.Weapon.VersatileDamageDice == "" {
+		return
+	}
+	for _, prop := range row.Details.Weapon.Properties {
+		if EqualWeaponProperty(prop, "versatile") {
+			return
+		}
+	}
+	row.Details.Weapon.Properties = append(row.Details.Weapon.Properties, "versatile")
+}
+
 // isKeyShape reports whether s matches the bulk key pattern: starts with a
 // lowercase letter, followed by zero or more lowercase letters, digits,
 // underscores, or hyphens. This is equivalent to ^[a-z][a-z0-9_-]*$.
