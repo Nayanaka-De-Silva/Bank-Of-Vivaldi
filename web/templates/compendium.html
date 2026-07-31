@@ -254,7 +254,8 @@
 {{define "compendium_cards"}}
 <div class="card-grid">
   {{range .}}
-    <article class="item-card {{rarityClass .Item.Rarity}}">
+    {{/* The description is clamped in the tile, so the full text rides along as a tooltip. */}}
+    <article class="item-card {{rarityClass .Item.Rarity}}"{{if .Item.Description}} title="{{.Item.Description}}"{{end}}>
       <h3 class="item-card__title"><a href="/items/{{.Item.ID}}">{{.Item.Name}}</a></h3>
       <p class="item-card__meta">
         <span>{{humanize .Item.Category}}</span>
