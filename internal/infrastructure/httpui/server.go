@@ -50,6 +50,10 @@ type TemplateData struct {
 	BulkDefaultsWeight        string
 	BulkDefaultsValue         int
 	BulkIsStackable           bool
+	BulkIsMagical             bool
+	BulkRequiresAttunement    bool
+	BulkIsEquipped            bool
+	BulkSourceKind            string
 }
 
 const defaultItemFormCategory = "equipment"
@@ -132,6 +136,8 @@ func NewServer(service *application.Service) (*Server, error) {
 		"weaponPropertyOptions": domain.WeaponPropertyOptions,
 		// Resolves stored properties for chip display; returns nil when there are no properties.
 		"weaponPropertyChips": weaponPropertyChips,
+		// Generates the bulk-import format spec from the live vocabulary.
+		"bulkFormatSpec": domain.BulkFormatSpec,
 	}
 
 	tmpl, err := template.New("pages").Funcs(funcs).ParseFS(webassets.FS, "templates/*.html")
@@ -679,12 +685,16 @@ func (s *Server) handleBulkPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	preview := s.service.PreviewBulk(r.FormValue("bulk_text"), domain.BulkDefaults{
+	preview, err := s.service.PreviewBulk(r.Context(), r.FormValue("bulk_text"), domain.BulkDefaults{
 		Category:           strings.TrimSpace(r.FormValue("default_category")),
 		Rarity:             domain.ParseRarity(r.FormValue("default_rarity")),
 		WeightHundredthsLB: weight,
 		BaseValueCP:        value,
 	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	encoded, err := s.service.EncodeBulkRows(preview.Rows)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -709,6 +719,10 @@ func (s *Server) handleBulkPreview(w http.ResponseWriter, r *http.Request) {
 		BulkDefaultsWeight:        r.FormValue("default_weight_lb"),
 		BulkDefaultsValue:         value,
 		BulkIsStackable:           r.FormValue("is_stackable") == "on",
+		BulkIsMagical:             r.FormValue("is_magical") == "on",
+		BulkRequiresAttunement:    r.FormValue("requires_attunement") == "on",
+		BulkIsEquipped:            r.FormValue("is_equipped") == "on",
+		BulkSourceKind:            r.FormValue("source_kind"),
 	})
 }
 
@@ -724,6 +738,10 @@ func (s *Server) handleBulkCommit(w http.ResponseWriter, r *http.Request) {
 		VaultID:               strings.TrimSpace(r.FormValue("vault_id")),
 		ParentContainerItemID: strings.TrimSpace(r.FormValue("parent_container_item_id")),
 		IsStackable:           r.FormValue("is_stackable") == "on",
+		IsMagical:             r.FormValue("is_magical") == "on",
+		RequiresAttunement:    r.FormValue("requires_attunement") == "on",
+		IsEquipped:            r.FormValue("is_equipped") == "on",
+		SourceKind:            domain.ParseSourceKind(r.FormValue("source_kind")),
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

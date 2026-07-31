@@ -146,6 +146,10 @@ type BulkCommitInput struct {
 	VaultID               string
 	ParentContainerItemID string
 	IsStackable           bool
+	SourceKind            domain.SourceKind
+	IsMagical             bool
+	RequiresAttunement    bool
+	IsEquipped            bool
 }
 
 func (s *Service) Settings(ctx context.Context) (domain.AppSettings, error) {
@@ -621,8 +625,82 @@ func (s *Service) MergeStacks(ctx context.Context, sourceID, targetID string) er
 	return s.store.DeleteItem(ctx, source.ID)
 }
 
-func (s *Service) PreviewBulk(text string, defaults domain.BulkDefaults) domain.BulkPreview {
-	return domain.ParseBulkItemInput(text, defaults)
+// PreviewBulk parses the bulk-import text and resolves any vault/container names
+// in the rows against the store. Name resolution failures append row errors rather
+// than returning a top-level error, so callers always get a BulkPreview to render.
+func (s *Service) PreviewBulk(ctx context.Context, text string, defaults domain.BulkDefaults) (domain.BulkPreview, error) {
+	preview := domain.ParseBulkItemInput(text, defaults)
+
+	vaults, err := s.AllVaults(ctx)
+	if err != nil {
+		return domain.BulkPreview{}, err
+	}
+	allItems, err := s.store.ListItems(ctx)
+	if err != nil {
+		return domain.BulkPreview{}, err
+	}
+
+	vaultsByName := make(map[string][]domain.Vault)
+	for _, v := range vaults {
+		key := strings.ToLower(v.CharacterName)
+		vaultsByName[key] = append(vaultsByName[key], v)
+	}
+
+	itemsByName := make(map[string][]domain.Item)
+	for _, item := range allItems {
+		key := strings.ToLower(item.Name)
+		itemsByName[key] = append(itemsByName[key], item)
+	}
+
+	for i := range preview.Rows {
+		row := &preview.Rows[i]
+
+		if row.VaultName != "" {
+			key := strings.ToLower(row.VaultName)
+			matches := vaultsByName[key]
+			switch len(matches) {
+			case 0:
+				row.Errors = append(row.Errors, fmt.Sprintf("vault %q not found", row.VaultName))
+			case 1:
+				row.ResolvedVaultID = matches[0].ID
+			default:
+				row.Errors = append(row.Errors, fmt.Sprintf("vault name %q is ambiguous (%d matches)", row.VaultName, len(matches)))
+			}
+		}
+
+		if row.ContainerName != "" {
+			key := strings.ToLower(row.ContainerName)
+			matches := itemsByName[key]
+			switch len(matches) {
+			case 0:
+				row.Errors = append(row.Errors, fmt.Sprintf("container %q not found", row.ContainerName))
+			case 1:
+				if !matches[0].IsContainer {
+					row.Errors = append(row.Errors, fmt.Sprintf("item %q is not a container", row.ContainerName))
+				} else {
+					row.ResolvedContainerID = matches[0].ID
+				}
+			default:
+				// Among multiple name matches, count those that are actually containers.
+				var containerMatches []domain.Item
+				for _, m := range matches {
+					if m.IsContainer {
+						containerMatches = append(containerMatches, m)
+					}
+				}
+				switch len(containerMatches) {
+				case 0:
+					row.Errors = append(row.Errors, fmt.Sprintf("item %q is not a container", row.ContainerName))
+				case 1:
+					row.ResolvedContainerID = containerMatches[0].ID
+				default:
+					row.Errors = append(row.Errors, fmt.Sprintf("container name %q is ambiguous (%d matches)", row.ContainerName, len(containerMatches)))
+				}
+			}
+		}
+	}
+
+	return preview, nil
 }
 
 func (s *Service) EncodeBulkRows(rows []domain.BulkPreviewRow) (string, error) {
@@ -655,19 +733,54 @@ func (s *Service) CommitBulk(ctx context.Context, input BulkCommitInput) error {
 	}
 
 	for _, row := range rows {
+		// Per-row location overrides batch location when resolved IDs are present.
+		locationKind := input.LocationKind
+		vaultID := input.VaultID
+		containerID := input.ParentContainerItemID
+
+		if row.ResolvedContainerID != "" {
+			locationKind = domain.LocationKindContainer
+			containerID = row.ResolvedContainerID
+			if row.ResolvedVaultID != "" {
+				vaultID = row.ResolvedVaultID
+			}
+		} else if row.ResolvedVaultID != "" {
+			locationKind = domain.LocationKindVaultRoot
+			vaultID = row.ResolvedVaultID
+			containerID = ""
+		} else if row.LocationKind != "" {
+			locationKind = row.LocationKind
+		}
+
+		// Per-row SourceKind overrides batch default; batch defaults to manual.
+		sourceKind := input.SourceKind
+		if sourceKind == "" {
+			sourceKind = domain.SourceKindManual
+		}
+		if row.SourceKind != "" {
+			sourceKind = row.SourceKind
+		}
+
 		_, err := s.SaveItem(ctx, SaveItemInput{
 			Name:               row.Name,
+			Description:        row.Description,
 			Category:           row.Category,
+			Subcategory:        row.Subcategory,
 			Rarity:             row.Rarity,
 			WeightHundredthsLB: row.WeightHundredthsLB,
 			BaseValueCP:        row.BaseValueCP,
 			Quantity:           row.Quantity,
-			IsStackable:        input.IsStackable,
-			SourceKind:         domain.SourceKindManual,
+			IsStackable:        boolOr(row.IsStackable, input.IsStackable),
+			IsContainer:        boolOr(row.IsContainer, false),
+			IsMagical:          boolOr(row.IsMagical, input.IsMagical),
+			RequiresAttunement: boolOr(row.RequiresAttunement, input.RequiresAttunement),
+			IsEquipped:         boolOr(row.IsEquipped, input.IsEquipped),
+			SourceKind:         sourceKind,
+			Details:            row.Details,
 			Location: domain.ItemLocation{
-				Kind:                  input.LocationKind,
-				OwnerVaultID:          input.VaultID,
-				ParentContainerItemID: input.ParentContainerItemID,
+				Kind:                  locationKind,
+				OwnerVaultID:          vaultID,
+				ParentContainerItemID: containerID,
 			},
 		})
 		if err != nil {
@@ -676,6 +789,15 @@ func (s *Service) CommitBulk(ctx context.Context, input BulkCommitInput) error {
 	}
 
 	return nil
+}
+
+// boolOr returns the value pointed to by override if non-nil, otherwise fallback.
+// It is used to merge per-row pointer bools with batch-level boolean defaults.
+func boolOr(override *bool, fallback bool) bool {
+	if override != nil {
+		return *override
+	}
+	return fallback
 }
 
 func (s *Service) SearchInventory(ctx context.Context, filters SearchFilters) ([]SearchResult, domain.AppSettings, error) {

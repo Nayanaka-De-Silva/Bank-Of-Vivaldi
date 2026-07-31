@@ -36,11 +36,11 @@ func TestBreakdownCPRoundTrip(t *testing.T) {
 
 func TestHumanizeLabel(t *testing.T) {
 	tests := map[string]string{
-		"":                "",
-		"equipment":       "Equipment",
-		"very-rare":       "Very Rare",
-		"wondrous-item":   "Wondrous Item",
-		"pull_request":    "Pull Request",
+		"":                     "",
+		"equipment":            "Equipment",
+		"very-rare":            "Very Rare",
+		"wondrous-item":        "Wondrous Item",
+		"pull_request":         "Pull Request",
 		"  adventuring-gear  ": "Adventuring Gear",
 	}
 
