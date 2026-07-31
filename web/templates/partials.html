@@ -40,6 +40,17 @@
 </html>
 {{end}}
 
+{{define "weapon_property_chips"}}
+<ul class="prop-chips">
+  {{range .}}
+    <li class="prop-chip{{if not .Description}} prop-chip--unknown{{end}}">
+      <span class="tag prop-chip__label"{{if .Description}} tabindex="0" title="{{.Description}}" aria-describedby="{{.DescriptionID}}"{{end}}>{{.Label}}</span>
+      {{if .Description}}<span class="prop-chip__tip" role="tooltip" id="{{.DescriptionID}}">{{.Description}}</span>{{end}}
+    </li>
+  {{end}}
+</ul>
+{{end}}
+
 {{define "item_nodes"}}
 <ul class="item-tree">
   {{range .}}

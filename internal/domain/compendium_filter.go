@@ -168,7 +168,8 @@ func (w WeaponCriteria) matches(item Item) bool {
 		return true
 	}
 	for _, property := range details.Properties {
-		if matchesText(property, w.Property) {
+		// EqualWeaponProperty tolerates case/separator variants (e.g. "Two Handed" == "two-handed").
+		if EqualWeaponProperty(property, w.Property) {
 			return true
 		}
 	}

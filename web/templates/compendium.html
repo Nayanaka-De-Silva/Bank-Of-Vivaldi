@@ -109,7 +109,7 @@
           <label>Property
             <select name="weapon_property">
               <option value="">Any</option>
-              {{range .Compendium.Facets.WeaponProperties}}
+              {{range weaponPropertyOptions $.Compendium.Facets.WeaponProperties}}
                 <option value="{{.}}" {{if eq $.CompendiumFilters.WeaponProperty .}}selected{{end}}>{{humanize .}}</option>
               {{end}}
             </select>
@@ -270,6 +270,7 @@
         {{if .Item.IsMagical}}<span class="tag">Magical</span>{{end}}
         {{if .Item.RequiresAttunement}}<span class="tag">Attunement</span>{{end}}
       </p>
+      {{with weaponPropertyChips .Item.ID .Item.Details.Weapon}}{{template "weapon_property_chips" .}}{{end}}
       {{if .Item.Description}}<p class="item-card__desc">{{.Item.Description}}</p>{{end}}
       {{if .IsNested}}<p class="item-card__path">In {{.ContainerPath}}</p>{{end}}
     </article>
@@ -288,6 +289,7 @@
       <th>Value</th>
       <th>Qty</th>
       <th>Container path</th>
+      <th>Properties</th>
     </tr>
   </thead>
   <tbody>
@@ -300,6 +302,7 @@
         <td>{{.UnitValueText}}</td>
         <td>{{.Item.Quantity}}</td>
         <td>{{if .IsNested}}{{.ContainerPath}}{{else}}Compendium root{{end}}</td>
+        <td>{{with weaponPropertyChips .Item.ID .Item.Details.Weapon}}{{template "weapon_property_chips" .}}{{end}}</td>
       </tr>
     {{end}}
   </tbody>

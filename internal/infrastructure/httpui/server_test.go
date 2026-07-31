@@ -306,11 +306,12 @@ func TestParseItemDetailsKeepsContainerMetadataForContainerItems(t *testing.T) {
 func TestParseItemDetailsParsesValidWeaponCategory(t *testing.T) {
 	t.Parallel()
 
+	// Checkboxes submit repeated values, not a single comma-joined string.
 	form := url.Values{
 		"weapon_class":        {"martial-ranged"},
 		"weapon_damage_dice":  {"1d8"},
 		"weapon_damage_type":  {"piercing"},
-		"weapon_properties":   {"ammunition, heavy, two-handed"},
+		"weapon_properties":   {"ammunition", "heavy", "two-handed"},
 		"weapon_normal_range": {"150"},
 		"weapon_long_range":   {"600"},
 	}
@@ -334,6 +335,11 @@ func TestParseItemDetailsParsesValidWeaponCategory(t *testing.T) {
 	}
 	if details.Weapon.NormalRange != 150 || details.Weapon.LongRange != 600 {
 		t.Fatalf("weapon ranges = %d/%d, want 150/600", details.Weapon.NormalRange, details.Weapon.LongRange)
+	}
+	// All three submitted properties must be stored.
+	wantProps := []string{"ammunition", "heavy", "two-handed"}
+	if !stringSlicesEqual(details.Weapon.Properties, wantProps) {
+		t.Fatalf("weapon properties = %v, want %v", details.Weapon.Properties, wantProps)
 	}
 }
 
@@ -378,6 +384,128 @@ func TestParseItemDetailsAllowsEmptyWeaponCategory(t *testing.T) {
 	if details.Weapon != nil {
 		t.Fatalf("expected no weapon metadata when the category is empty")
 	}
+}
+
+func TestParseItemDetailsRepeatedWeaponPropertiesParseIntoSlice(t *testing.T) {
+	t.Parallel()
+
+	// Repeated form values (checkbox semantics) must be read via r.Form, not r.FormValue.
+	form := url.Values{
+		"weapon_class":      {"simple-melee"},
+		"weapon_properties": {"finesse", "light"},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/items", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := req.ParseForm(); err != nil {
+		t.Fatalf("parse form: %v", err)
+	}
+
+	details, err := parseItemDetails(req, "weapon", false)
+	if err != nil {
+		t.Fatalf("parse item details: %v", err)
+	}
+	if details.Weapon == nil {
+		t.Fatalf("expected weapon metadata")
+	}
+	want := []string{"finesse", "light"}
+	if !stringSlicesEqual(details.Weapon.Properties, want) {
+		t.Fatalf("properties = %v, want %v", details.Weapon.Properties, want)
+	}
+}
+
+func TestParseItemDetailsCanonicalizesKnownPropertyVariants(t *testing.T) {
+	t.Parallel()
+
+	// "Two-Handed" (form variant) must be stored as the canonical slug "two-handed".
+	form := url.Values{
+		"weapon_class":      {"martial-melee"},
+		"weapon_properties": {"Two-Handed"},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/items", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := req.ParseForm(); err != nil {
+		t.Fatalf("parse form: %v", err)
+	}
+
+	details, err := parseItemDetails(req, "weapon", false)
+	if err != nil {
+		t.Fatalf("parse item details: %v", err)
+	}
+	if details.Weapon == nil {
+		t.Fatalf("expected weapon metadata")
+	}
+	if !stringSlicesEqual(details.Weapon.Properties, []string{"two-handed"}) {
+		t.Fatalf("properties = %v, want [two-handed]", details.Weapon.Properties)
+	}
+}
+
+func TestParseItemDetailsPreservesUnknownPropertyValues(t *testing.T) {
+	t.Parallel()
+
+	// "glowing" is not a canonical PHB property; it must be kept as-is with no error.
+	form := url.Values{
+		"weapon_class":      {"martial-melee"},
+		"weapon_properties": {"glowing"},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/items", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := req.ParseForm(); err != nil {
+		t.Fatalf("parse form: %v", err)
+	}
+
+	details, err := parseItemDetails(req, "weapon", false)
+	if err != nil {
+		t.Fatalf("expected no error for unknown property, got: %v", err)
+	}
+	if details.Weapon == nil {
+		t.Fatalf("expected weapon metadata")
+	}
+	if !stringSlicesEqual(details.Weapon.Properties, []string{"glowing"}) {
+		t.Fatalf("properties = %v, want [glowing]", details.Weapon.Properties)
+	}
+}
+
+func TestParseItemDetailsPropertiesSurviveWithEmptyWeaponClass(t *testing.T) {
+	t.Parallel()
+
+	// Properties must be stored even when weapon_class is not set.
+	form := url.Values{
+		"weapon_class":      {""},
+		"weapon_properties": {"versatile"},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/items", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := req.ParseForm(); err != nil {
+		t.Fatalf("parse form: %v", err)
+	}
+
+	details, err := parseItemDetails(req, "weapon", false)
+	if err != nil {
+		t.Fatalf("parse item details: %v", err)
+	}
+	if details.Weapon == nil {
+		t.Fatalf("expected weapon metadata to be set when properties are present even without a weapon class")
+	}
+	if !stringSlicesEqual(details.Weapon.Properties, []string{"versatile"}) {
+		t.Fatalf("properties = %v, want [versatile]", details.Weapon.Properties)
+	}
+}
+
+// stringSlicesEqual reports whether two string slices are element-wise equal.
+func stringSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestItemFormLocationCompendiumKindDisablesBothSelects(t *testing.T) {
@@ -629,6 +757,159 @@ func renderCompendium(t *testing.T, data TemplateData) string {
 	return rendered.String()
 }
 
+func TestItemFormWeaponPropertiesRendersCheckboxes(t *testing.T) {
+	t.Parallel()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	var rendered bytes.Buffer
+	err = server.tmpl.ExecuteTemplate(&rendered, "item_form_fields", TemplateData{
+		Categories: domain.Categories(),
+		Rarities:   domain.Rarities(),
+		Item:       domain.Item{Category: "weapon"},
+	})
+	if err != nil {
+		t.Fatalf("render item form fields: %v", err)
+	}
+
+	html := rendered.String()
+
+	// All ten canonical weapon properties must render as checkboxes.
+	for _, prop := range domain.WeaponProperties() {
+		checkbox := `<input type="checkbox" name="weapon_properties" value="` + prop.Key + `"`
+		if !strings.Contains(html, checkbox) {
+			t.Errorf("expected checkbox for property %q, got:\n%s", prop.Key, html)
+		}
+		if !strings.Contains(html, prop.Label) {
+			t.Errorf("expected label text %q for property %q", prop.Label, prop.Key)
+		}
+		if !strings.Contains(html, prop.Description) {
+			t.Errorf("expected description text for property %q", prop.Key)
+		}
+	}
+
+	// The old free-text input must be gone.
+	if strings.Contains(html, `<input type="text" name="weapon_properties"`) {
+		t.Fatalf("expected no free-text weapon_properties input, but found one")
+	}
+}
+
+func TestItemFormWeaponPropertiesPreChecksStoredValue(t *testing.T) {
+	t.Parallel()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	item := domain.Item{Category: "weapon"}
+	item.Details.Weapon = &domain.WeaponDetails{
+		WeaponClass: "martial-melee",
+		Properties:  []string{"versatile"},
+	}
+
+	var rendered bytes.Buffer
+	err = server.tmpl.ExecuteTemplate(&rendered, "item_form_fields", TemplateData{
+		Categories: domain.Categories(),
+		Rarities:   domain.Rarities(),
+		Item:       item,
+	})
+	if err != nil {
+		t.Fatalf("render item form fields: %v", err)
+	}
+
+	html := rendered.String()
+	// "versatile" must be checked.
+	if !strings.Contains(html, `value="versatile" checked`) {
+		t.Fatalf("expected versatile checkbox to be pre-checked, got:\n%s", html)
+	}
+	// Other canonical properties must not be checked.
+	if strings.Contains(html, `value="thrown" checked`) {
+		t.Fatalf("expected thrown checkbox to be unchecked")
+	}
+}
+
+func TestItemFormWeaponPropertiesRendersLegacyUnknownProperty(t *testing.T) {
+	t.Parallel()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	item := domain.Item{Category: "weapon"}
+	item.Details.Weapon = &domain.WeaponDetails{Properties: []string{"glowing"}}
+
+	var rendered bytes.Buffer
+	err = server.tmpl.ExecuteTemplate(&rendered, "item_form_fields", TemplateData{
+		Categories: domain.Categories(),
+		Rarities:   domain.Rarities(),
+		Item:       item,
+	})
+	if err != nil {
+		t.Fatalf("render item form fields: %v", err)
+	}
+
+	html := rendered.String()
+	// An unknown property must appear as an extra checked checkbox.
+	if !strings.Contains(html, `value="glowing" checked`) {
+		t.Fatalf("expected legacy glowing checkbox to be pre-checked, got:\n%s", html)
+	}
+	// Its label must carry the legacy CSS modifier class.
+	if !strings.Contains(html, "property-option--legacy") {
+		t.Fatalf("expected property-option--legacy class for legacy property, got:\n%s", html)
+	}
+}
+
+func TestItemFormWeaponPropertiesThrownDetectionScript(t *testing.T) {
+	t.Parallel()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	var rendered bytes.Buffer
+	err = server.tmpl.ExecuteTemplate(&rendered, "item_form_fields", TemplateData{
+		Categories: domain.Categories(),
+		Rarities:   domain.Rarities(),
+		Item:       domain.Item{Category: "weapon"},
+	})
+	if err != nil {
+		t.Fatalf("render item form fields: %v", err)
+	}
+
+	html := rendered.String()
+
+	// Thrown detection must use checkbox semantics, not text-input comma-splitting.
+	for _, fragment := range []string{
+		`input[name="weapon_properties"]`,
+		`box.checked`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Errorf("expected thrown-detection script to contain %q", fragment)
+		}
+	}
+
+	// The existing weaponClassSelect listener and range-fields container must remain.
+	for _, fragment := range []string{
+		`data-weapon-range-fields`,
+		`weaponClassSelect.addEventListener`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Errorf("expected form script to still contain %q", fragment)
+		}
+	}
+
+	// The old text-input event listener must be gone.
+	if strings.Contains(html, `propertiesInput`) {
+		t.Fatalf("expected old propertiesInput variable to be removed from script")
+	}
+}
+
 func TestCompendiumRendersTilesByDefault(t *testing.T) {
 	t.Parallel()
 
@@ -838,6 +1119,175 @@ func TestCompendiumEmptyResultExplainsTheFilter(t *testing.T) {
 	}
 }
 
+// weaponCompendiumTemplateData builds a one-weapon-entry compendium for chip tests.
+// Kept separate from compendiumTemplateData so the card-count assertion there stays valid.
+func weaponCompendiumTemplateData(view string) TemplateData {
+	longbow := domain.Item{
+		ID:                 "longbow-1",
+		Name:               "Longbow",
+		Category:           "weapon",
+		Rarity:             domain.RarityMundane,
+		Description:        "A tall bow made of flexible wood.",
+		WeightHundredthsLB: 200,
+		BaseValueCP:        5000,
+		Quantity:           1,
+	}
+	longbow.Details.Weapon = &domain.WeaponDetails{
+		WeaponClass: "martial-ranged",
+		Properties:  []string{"thrown", "silvered"}, // one canonical, one legacy
+	}
+
+	return TemplateData{
+		Title:             "Compendium",
+		Categories:        domain.Categories(),
+		Rarities:          domain.Rarities(),
+		CompendiumView:    view,
+		CompendiumFilters: application.CompendiumFilters{},
+		Compendium: application.CompendiumBrowse{
+			Entries: []application.CompendiumEntry{{
+				Item:           longbow,
+				ContainerPath:  "",
+				IsNested:       false,
+				UnitWeightLB:   "2",
+				UnitValueText:  "50 gp",
+				TotalWeightLB:  "2",
+				TotalValueText: "50 gp",
+			}},
+			Facets:     domain.CompendiumFacets{WeaponProperties: []string{"silvered"}},
+			TotalCount: 1,
+			MatchCount: 1,
+		},
+	}
+}
+
+func renderItemDetail(t *testing.T, data TemplateData) string {
+	t.Helper()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	var rendered bytes.Buffer
+	if err := server.tmpl.ExecuteTemplate(&rendered, "item_detail", data); err != nil {
+		t.Fatalf("render item_detail: %v", err)
+	}
+	return rendered.String()
+}
+
+func TestWeaponPropertyChipsRenderOnCompendiumCard(t *testing.T) {
+	t.Parallel()
+
+	html := renderCompendium(t, weaponCompendiumTemplateData(compendiumViewTiles))
+
+	// Canonical "thrown" chip must have a label, tooltip, and aria wiring.
+	if !strings.Contains(html, `>Thrown<`) {
+		t.Fatalf("expected Thrown chip label, got:\n%s", html)
+	}
+	if !strings.Contains(html, `aria-describedby="wp-longbow-1-thrown"`) {
+		t.Fatalf("expected aria-describedby for thrown chip, got:\n%s", html)
+	}
+	if !strings.Contains(html, `id="wp-longbow-1-thrown"`) {
+		t.Fatalf("expected tooltip element id for thrown chip, got:\n%s", html)
+	}
+	// The title attribute must carry the thrown description (attribute context, no escaping of plain text).
+	thrownDesc := domain.WeaponProperties()[7].Description // thrown is index 7
+	if !strings.Contains(html, `title="`+thrownDesc+`"`) {
+		t.Fatalf("expected title attribute with thrown description, got:\n%s", html)
+	}
+
+	// Unknown "silvered" chip must have the legacy class and no aria-describedby.
+	if !strings.Contains(html, `prop-chip--unknown`) {
+		t.Fatalf("expected prop-chip--unknown class for silvered chip, got:\n%s", html)
+	}
+	if strings.Contains(html, `aria-describedby="wp-longbow-1-silvered"`) {
+		t.Fatalf("expected no aria-describedby for unknown silvered chip, got:\n%s", html)
+	}
+
+	// The card must still have exactly one item link.
+	card := strings.Index(html, `<article class="item-card`)
+	if card < 0 {
+		t.Fatalf("expected an item card article, got:\n%s", html)
+	}
+	if count := strings.Count(html[card:], `<a href="/items/`); count != 1 {
+		t.Fatalf("expected exactly one item link per card, got %d:\n%s", count, html[card:])
+	}
+}
+
+func TestWeaponPropertyChipsRenderOnCompendiumListColumn(t *testing.T) {
+	t.Parallel()
+
+	html := renderCompendium(t, weaponCompendiumTemplateData(compendiumViewList))
+
+	if !strings.Contains(html, `<th>Properties</th>`) {
+		t.Fatalf("expected Properties column header in list view, got:\n%s", html)
+	}
+	// Thrown chip must appear in the table row.
+	if !strings.Contains(html, `>Thrown<`) {
+		t.Fatalf("expected Thrown chip in list view row, got:\n%s", html)
+	}
+}
+
+func TestWeaponPropertyChipsRenderOnItemDetail(t *testing.T) {
+	t.Parallel()
+
+	longbow := domain.Item{
+		ID:       "longbow-detail-1",
+		Name:     "Longbow",
+		Category: "weapon",
+	}
+	longbow.Details.Weapon = &domain.WeaponDetails{
+		Properties: []string{"finesse"},
+	}
+
+	data := TemplateData{
+		Categories:  domain.Categories(),
+		Rarities:    domain.Rarities(),
+		AllVaults:   []domain.Vault{},
+		ItemDetail:  application.ItemDetail{Item: longbow},
+	}
+
+	html := renderItemDetail(t, data)
+
+	if !strings.Contains(html, "Weapon properties") {
+		t.Fatalf("expected Weapon properties heading on item detail page, got:\n%s", html)
+	}
+	if !strings.Contains(html, `>Finesse<`) {
+		t.Fatalf("expected Finesse chip on item detail page, got:\n%s", html)
+	}
+}
+
+func TestStylesheetIncludesWeaponPropertyChipAndFormCSS(t *testing.T) {
+	t.Parallel()
+
+	stylesheet := readStylesheet(t)
+
+	for _, fragment := range []string{
+		`.prop-chip__tip {`,
+		`opacity: 0;`,
+		`.prop-chip:focus-within .prop-chip__tip`,
+		`.property-option input[type="checkbox"]`,
+		`width: auto;`,
+	} {
+		if !strings.Contains(stylesheet, fragment) {
+			t.Errorf("expected stylesheet to contain %q", fragment)
+		}
+	}
+
+	// z-index: 1; must appear inside the .prop-chips rule.
+	propChips := strings.Index(stylesheet, ".prop-chips {")
+	if propChips < 0 {
+		t.Fatalf("expected .prop-chips rule in stylesheet")
+	}
+	propChipsRule := stylesheet[propChips:]
+	if end := strings.Index(propChipsRule, "}"); end >= 0 {
+		propChipsRule = propChipsRule[:end]
+	}
+	if !strings.Contains(propChipsRule, "z-index: 1;") {
+		t.Fatalf("expected z-index: 1; inside .prop-chips rule, got:\n%s", propChipsRule)
+	}
+}
+
 func TestNormalizeCompendiumView(t *testing.T) {
 	t.Parallel()
 
@@ -849,6 +1299,25 @@ func TestNormalizeCompendiumView(t *testing.T) {
 	}
 	if got := normalizeCompendiumView("nonsense"); got != compendiumViewTiles {
 		t.Fatalf("unknown view = %q, want the tiles default", got)
+	}
+}
+
+func TestCompendiumWeaponPropertyDropdownContainsAllCanonicalAndLegacyOptions(t *testing.T) {
+	t.Parallel()
+
+	// The dropdown must always show all ten canonical keys, even with an empty compendium.
+	html := renderCompendium(t, weaponCompendiumTemplateData(compendiumViewTiles))
+
+	for _, prop := range domain.WeaponProperties() {
+		option := `<option value="` + prop.Key + `"`
+		if !strings.Contains(html, option) {
+			t.Errorf("expected canonical option %q in weapon property dropdown, got:\n%s", prop.Key, html)
+		}
+	}
+
+	// The legacy facet value "silvered" (from the fixture) must also appear in the dropdown.
+	if !strings.Contains(html, `<option value="silvered"`) {
+		t.Fatalf("expected legacy silvered option in weapon property dropdown, got:\n%s", html)
 	}
 }
 
