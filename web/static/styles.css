@@ -299,11 +299,31 @@ td {
   /* The rarity tier is carried by the left edge accent. */
   border-left: 4px solid var(--rarity, var(--border));
   border-radius: 0.6rem;
+  /* Positioning context for the stretched title link below. */
+  position: relative;
+}
+
+.item-card:hover {
+  border-color: var(--accent);
+}
+
+/* The anchor's own outline is a zero-area box, so the card carries the focus ring. */
+.item-card:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .item-card__title {
   margin: 0;
   font-size: 1.05rem;
+}
+
+/* Stretch the title link over the whole tile so any click opens the item. */
+.item-card__title a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
 }
 
 .item-card__meta {
@@ -329,10 +349,16 @@ td {
   color: var(--muted);
 }
 
+/* Clamped so a long description cannot stretch the tile or its whole grid row. */
 .item-card__desc {
   margin: 0.25rem 0 0;
   font-size: 0.9rem;
   line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .item-card__path {

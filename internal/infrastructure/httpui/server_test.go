@@ -152,6 +152,66 @@ func TestStylesheetPreservesHiddenAttribute(t *testing.T) {
 	}
 }
 
+// readStylesheet loads web/static/styles.css relative to this test file.
+func readStylesheet(t *testing.T) string {
+	t.Helper()
+
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatalf("resolve current file path")
+	}
+
+	stylesheetPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "web", "static", "styles.css")
+	css, err := os.ReadFile(stylesheetPath)
+	if err != nil {
+		t.Fatalf("read stylesheet: %v", err)
+	}
+	return string(css)
+}
+
+func TestStylesheetClampsCompendiumCardDescription(t *testing.T) {
+	t.Parallel()
+
+	stylesheet := readStylesheet(t)
+	for _, declaration := range []string{
+		".item-card__desc {",
+		"-webkit-line-clamp: 3;",
+		"-webkit-box-orient: vertical;",
+		"overflow: hidden;",
+	} {
+		if !strings.Contains(stylesheet, declaration) {
+			t.Fatalf("expected card descriptions to be clamped via %q", declaration)
+		}
+	}
+}
+
+func TestStylesheetStretchesCompendiumCardLink(t *testing.T) {
+	t.Parallel()
+
+	stylesheet := readStylesheet(t)
+	for _, declaration := range []string{
+		".item-card__title a::after {",
+		"position: absolute;",
+		"inset: 0;",
+	} {
+		if !strings.Contains(stylesheet, declaration) {
+			t.Fatalf("expected the card title link to be stretched over the tile via %q", declaration)
+		}
+	}
+
+	card := strings.Index(stylesheet, ".item-card {")
+	if card < 0 {
+		t.Fatalf("expected an .item-card rule in the stylesheet")
+	}
+	cardRule := stylesheet[card:]
+	if end := strings.Index(cardRule, "}"); end >= 0 {
+		cardRule = cardRule[:end]
+	}
+	if !strings.Contains(cardRule, "position: relative;") {
+		t.Fatalf("expected .item-card to establish a positioning context, got:\n%s", cardRule)
+	}
+}
+
 func TestParseItemDetailsIgnoresInactiveCategoryMetadata(t *testing.T) {
 	t.Parallel()
 
@@ -564,16 +624,60 @@ func TestCompendiumCardOrdersFieldsPerIssueLayout(t *testing.T) {
 
 	html := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{}))
 
-	name := strings.Index(html, "Scale Mail")
+	name := strings.Index(html, `class="item-card__title"`)
 	meta := strings.Index(html, `class="item-card__meta"`)
 	stats := strings.Index(html, `class="item-card__stats"`)
-	description := strings.Index(html, "Interlocking metal rings")
+	// Anchored on the element, not the text: the description also appears in the card tooltip.
+	description := strings.Index(html, `class="item-card__desc"`)
 
 	if name < 0 || meta < 0 || stats < 0 || description < 0 {
 		t.Fatalf("expected name, meta, stats and description on the card, got:\n%s", html)
 	}
 	if !(name < meta && meta < stats && stats < description) {
 		t.Fatalf("expected card order name -> category/rarity -> weight/value -> description, got:\n%s", html)
+	}
+	if !strings.Contains(html, ">Scale Mail<") {
+		t.Fatalf("expected the card title to show the item name, got:\n%s", html)
+	}
+}
+
+func TestCompendiumCardExposesFullDescriptionAsTooltip(t *testing.T) {
+	t.Parallel()
+
+	html := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{}))
+
+	tooltip := `title="Interlocking metal rings sewn onto a leather backing."`
+	card := strings.Index(html, `<article class="item-card`)
+	if card < 0 {
+		t.Fatalf("expected an item card article, got:\n%s", html)
+	}
+	openingTag := html[card:]
+	if end := strings.Index(openingTag, ">"); end >= 0 {
+		openingTag = openingTag[:end]
+	}
+	if !strings.Contains(openingTag, tooltip) {
+		t.Fatalf("expected the card to carry the full description as a tooltip, got:\n%s", openingTag)
+	}
+
+	// The stretched link relies on the card holding exactly one anchor.
+	if count := strings.Count(html[card:], `<a href="/items/`); count != 1 {
+		t.Fatalf("expected exactly one item link per card, got %d:\n%s", count, html)
+	}
+}
+
+func TestCompendiumCardOmitsTooltipWithoutDescription(t *testing.T) {
+	t.Parallel()
+
+	data := compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{})
+	data.Compendium.Entries[0].Item.Description = ""
+
+	html := renderCompendium(t, data)
+
+	if strings.Contains(html, `title=""`) {
+		t.Fatalf("expected no empty tooltip when the item has no description, got:\n%s", html)
+	}
+	if strings.Contains(html, `class="item-card__desc"`) {
+		t.Fatalf("expected no description paragraph when the item has no description, got:\n%s", html)
 	}
 }
 
