@@ -495,6 +495,33 @@ func TestParseItemDetailsPropertiesSurviveWithEmptyWeaponClass(t *testing.T) {
 	}
 }
 
+func TestParseItemDetailsParsesVersatileDamageDice(t *testing.T) {
+	t.Parallel()
+
+	// A checked versatile property alongside a versatile die must be stored on WeaponDetails.
+	form := url.Values{
+		"weapon_properties":            {"versatile"},
+		"weapon_versatile_damage_dice": {"1d8"},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/items", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if err := req.ParseForm(); err != nil {
+		t.Fatalf("parse form: %v", err)
+	}
+
+	details, err := parseItemDetails(req, "weapon", false)
+	if err != nil {
+		t.Fatalf("parse item details: %v", err)
+	}
+	if details.Weapon == nil {
+		t.Fatalf("expected weapon metadata to be set when versatile property is present")
+	}
+	if details.Weapon.VersatileDamageDice != "1d8" {
+		t.Fatalf("VersatileDamageDice = %q, want %q", details.Weapon.VersatileDamageDice, "1d8")
+	}
+}
+
 // stringSlicesEqual reports whether two string slices are element-wise equal.
 func stringSlicesEqual(a, b []string) bool {
 	if len(a) != len(b) {
@@ -1072,6 +1099,47 @@ func TestItemFormWeaponPropertiesThrownDetectionScript(t *testing.T) {
 	// The old text-input event listener must be gone.
 	if strings.Contains(html, `propertiesInput`) {
 		t.Fatalf("expected old propertiesInput variable to be removed from script")
+	}
+}
+
+func TestItemFormVersatileDetectionScript(t *testing.T) {
+	t.Parallel()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	var rendered bytes.Buffer
+	err = server.tmpl.ExecuteTemplate(&rendered, "item_form_fields", TemplateData{
+		Categories: domain.Categories(),
+		Rarities:   domain.Rarities(),
+		Item:       domain.Item{Category: "weapon"},
+	})
+	if err != nil {
+		t.Fatalf("render item form fields: %v", err)
+	}
+
+	html := rendered.String()
+
+	// The versatile field wrapper and input must appear in the rendered form.
+	for _, fragment := range []string{
+		`data-weapon-versatile-fields`,
+		`weapon_versatile_damage_dice`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Errorf("expected versatile form fields to contain %q", fragment)
+		}
+	}
+
+	// The versatile show/hide logic must be present and keyed on the versatile checkbox.
+	for _, fragment := range []string{
+		`versatileFields`,
+		`"versatile"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Errorf("expected versatile detection script to contain %q", fragment)
+		}
 	}
 }
 

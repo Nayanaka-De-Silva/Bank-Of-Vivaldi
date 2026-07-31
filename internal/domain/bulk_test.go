@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -248,6 +249,93 @@ func TestParseBulkItemInputWeaponAttributeOnWrongCategory(t *testing.T) {
 	}
 	if len(preview.Rows[0].Errors) == 0 {
 		t.Error("expected error for weapon attribute on non-weapon category, got none")
+	}
+}
+
+func TestParseBulkItemInputVersatileAttribute(t *testing.T) {
+	// versatile= on a weapon row must set VersatileDamageDice.
+	preview := ParseBulkItemInput(
+		"Quarterstaff | weapon | mundane | 4 | 2sp | A sturdy staff. | damage=1d6 | versatile=1d8 | props=versatile",
+		BulkDefaults{},
+	)
+	if len(preview.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(preview.Rows))
+	}
+	row := preview.Rows[0]
+	if len(row.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", row.Errors)
+	}
+	if row.Details.Weapon == nil {
+		t.Fatal("WeaponDetails is nil")
+	}
+	if row.Details.Weapon.VersatileDamageDice != "1d8" {
+		t.Errorf("VersatileDamageDice = %q, want \"1d8\"", row.Details.Weapon.VersatileDamageDice)
+	}
+}
+
+func TestParseBulkItemInputVersatileDieImpliesVersatileProperty(t *testing.T) {
+	// A versatile die without props=versatile would be incoherent: the item form
+	// only reveals the versatile input while that property is checked, so the die
+	// would be invisible and silently dropped on the next save. The parser adds
+	// the property so the row is self-consistent.
+	preview := ParseBulkItemInput("Quarterstaff | weapon | mundane | 4 | 2sp | versatile=1d8", BulkDefaults{})
+	row := preview.Rows[0]
+	if len(row.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", row.Errors)
+	}
+	if row.Details.Weapon == nil {
+		t.Fatal("WeaponDetails is nil")
+	}
+	if row.Details.Weapon.VersatileDamageDice != "1d8" {
+		t.Errorf("VersatileDamageDice = %q, want \"1d8\"", row.Details.Weapon.VersatileDamageDice)
+	}
+	if !slices.ContainsFunc(row.Details.Weapon.Properties, func(p string) bool {
+		return EqualWeaponProperty(p, "versatile")
+	}) {
+		t.Errorf("Properties = %v, want it to include \"versatile\"", row.Details.Weapon.Properties)
+	}
+}
+
+func TestParseBulkItemInputVersatileDieSurvivesLaterPropsAssignment(t *testing.T) {
+	// "props=" assigns the properties slice wholesale, so a props= appearing
+	// after versatile= must not strip the implied versatile property.
+	preview := ParseBulkItemInput("Quarterstaff | weapon | mundane | 4 | 2sp | versatile=1d8 | props=finesse", BulkDefaults{})
+	row := preview.Rows[0]
+	if len(row.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", row.Errors)
+	}
+	props := row.Details.Weapon.Properties
+	if !slices.ContainsFunc(props, func(p string) bool { return EqualWeaponProperty(p, "versatile") }) {
+		t.Errorf("Properties = %v, want it to include \"versatile\"", props)
+	}
+	if !slices.ContainsFunc(props, func(p string) bool { return EqualWeaponProperty(p, "finesse") }) {
+		t.Errorf("Properties = %v, want it to retain \"finesse\"", props)
+	}
+}
+
+func TestParseBulkItemInputVersatilePropertyNotDuplicated(t *testing.T) {
+	// props=versatile alongside versatile=1d8 must not yield the property twice.
+	preview := ParseBulkItemInput("Quarterstaff | weapon | mundane | 4 | 2sp | versatile=1d8 | props=versatile", BulkDefaults{})
+	row := preview.Rows[0]
+	count := 0
+	for _, p := range row.Details.Weapon.Properties {
+		if EqualWeaponProperty(p, "versatile") {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("versatile property appears %d times in %v, want exactly 1", count, row.Details.Weapon.Properties)
+	}
+}
+
+func TestParseBulkItemInputVersatileAttributeOnWrongCategory(t *testing.T) {
+	// versatile= on a non-weapon category must produce a row error.
+	preview := ParseBulkItemInput("Cloak | equipment | mundane | 1 | 50gp | versatile=1d8", BulkDefaults{})
+	if len(preview.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(preview.Rows))
+	}
+	if len(preview.Rows[0].Errors) == 0 {
+		t.Error("expected error for versatile attribute on non-weapon category, got none")
 	}
 }
 

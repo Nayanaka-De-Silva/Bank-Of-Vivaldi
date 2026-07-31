@@ -13,7 +13,7 @@ import (
 // TestBulkFormatSpecCoversVocabulary ensures that the spec cannot drift.
 var bulkKnownKeys = map[string]bool{
 	// Weapon (category=weapon required).
-	"damage": true, "dtype": true, "props": true, "class": true, "range": true,
+	"damage": true, "dtype": true, "props": true, "class": true, "range": true, "versatile": true,
 	// Armor (category=armor required).
 	"armor-class": true, "ac": true, "dex-mod": true, "str-req": true, "stealth-dis": true,
 	// Tool (category=tool required).
@@ -37,7 +37,7 @@ var bulkKnownKeys = map[string]bool{
 func BulkAttributeKeys() []string {
 	return []string{
 		// Weapon
-		"damage", "dtype", "props", "class", "range",
+		"damage", "dtype", "props", "class", "range", "versatile",
 		// Armor
 		"armor-class", "ac", "dex-mod", "str-req", "stealth-dis",
 		// Tool
@@ -55,6 +55,29 @@ func BulkAttributeKeys() []string {
 		// String overrides
 		"subcategory", "source", "location", "vault", "parent",
 	}
+}
+
+// reconcileVersatileProperty guarantees that a row carrying a versatile damage
+// die also carries the "versatile" property. A die without the property is
+// incoherent — the item form only reveals the versatile input while that
+// property is checked, so such a die would be invisible in the form and
+// silently dropped by the next save. Bulk import is the only way to reach that
+// state, so it is repaired here rather than rejected: specifying a versatile
+// die is an unambiguous statement that the weapon is versatile.
+//
+// This runs after the whole segment loop rather than inside the versatile case
+// because "props=" assigns the properties slice wholesale, so an earlier
+// versatile= could otherwise be undone by a later props= on the same line.
+func reconcileVersatileProperty(row *BulkPreviewRow) {
+	if row.Details.Weapon == nil || row.Details.Weapon.VersatileDamageDice == "" {
+		return
+	}
+	for _, prop := range row.Details.Weapon.Properties {
+		if EqualWeaponProperty(prop, "versatile") {
+			return
+		}
+	}
+	row.Details.Weapon.Properties = append(row.Details.Weapon.Properties, "versatile")
 }
 
 // isKeyShape reports whether s matches the bulk key pattern: starts with a
@@ -190,6 +213,15 @@ func applyBulkAttribute(seg string, row *BulkPreviewRow) (keyShaped bool, err er
 			}
 			row.Details.Weapon.NormalRange = normal
 		}
+
+	case "versatile":
+		if row.Category != "weapon" {
+			return true, fmt.Errorf("attribute %q requires category \"weapon\", got %q", key, row.Category)
+		}
+		if row.Details.Weapon == nil {
+			row.Details.Weapon = &WeaponDetails{}
+		}
+		row.Details.Weapon.VersatileDamageDice = val
 
 	// --- Armor attributes (require category=armor) ---
 

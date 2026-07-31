@@ -142,6 +142,11 @@
         <input type="number" name="weapon_long_range" value="{{with .Item.Details.Weapon}}{{.LongRange}}{{end}}">
       </label>
     </div>
+    <div class="grid two" data-weapon-versatile-fields>
+      <label>Versatile damage dice
+        <input type="text" name="weapon_versatile_damage_dice" value="{{with .Item.Details.Weapon}}{{.VersatileDamageDice}}{{end}}">
+      </label>
+    </div>
   </section>
 
   <section class="metadata-group stack" data-metadata-group="tool" {{if not $showTool}}hidden{{end}}>
@@ -249,6 +254,7 @@
   const weaponClassSelect = form.querySelector('select[name="weapon_class"]');
   const propertyBoxes = Array.from(form.querySelectorAll('input[name="weapon_properties"]'));
   const rangeFields = form.querySelector("[data-weapon-range-fields]");
+  const versatileFields = form.querySelector("[data-weapon-versatile-fields]");
   if (!weaponGroup || !weaponClassSelect || !rangeFields) return;
 
   const rangeInputs = Array.from(rangeFields.querySelectorAll("input"));
@@ -270,14 +276,34 @@
     });
   };
 
+  const syncWeaponVersatileFields = () => {
+    if (!versatileFields) return;
+    // Skip while the weapon group is hidden; the category script already disabled its inputs.
+    if (weaponGroup.hidden) return;
+
+    const hasVersatile = propertyBoxes.some(
+      (box) => box.checked && box.value.trim().toLowerCase() === "versatile",
+    );
+    const versatileInputs = Array.from(versatileFields.querySelectorAll("input"));
+    versatileFields.hidden = !hasVersatile;
+    versatileInputs.forEach((input) => {
+      input.disabled = !hasVersatile;
+    });
+  };
+
   weaponClassSelect.addEventListener("change", syncWeaponRangeFields);
-  propertyBoxes.forEach((box) => box.addEventListener("change", syncWeaponRangeFields));
-  // Re-run after the category script toggles the weapon group so hidden ranges stay disabled.
+  propertyBoxes.forEach((box) => {
+    box.addEventListener("change", syncWeaponRangeFields);
+    box.addEventListener("change", syncWeaponVersatileFields);
+  });
+  // Re-run after the category script toggles the weapon group so hidden fields stay disabled.
   const categorySelect = form.querySelector('select[name="category"]');
   if (categorySelect) {
     categorySelect.addEventListener("change", syncWeaponRangeFields);
+    categorySelect.addEventListener("change", syncWeaponVersatileFields);
   }
   syncWeaponRangeFields();
+  syncWeaponVersatileFields();
 })();
 </script>
 {{end}}

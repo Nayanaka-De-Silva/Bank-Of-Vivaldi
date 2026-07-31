@@ -148,6 +148,8 @@ func ParseBulkItemInput(text string, defaults BulkDefaults) BulkPreview {
 			row.Description = strings.Join(descParts, " | ")
 		}
 
+		reconcileVersatileProperty(&row)
+
 		if row.Quantity < 1 {
 			row.Errors = append(row.Errors, "quantity must be at least 1")
 		}
@@ -231,7 +233,7 @@ func BulkFormatSpec() string {
 	b.WriteString("\n")
 
 	b.WriteString("Attribute keys by category:\n")
-	b.WriteString("  Weapon  (category=weapon required):           damage dtype props class range\n")
+	b.WriteString("  Weapon  (category=weapon required):           damage dtype props class range versatile\n")
 	b.WriteString("  Armor   (category=armor required):            armor-class ac dex-mod str-req stealth-dis\n")
 	b.WriteString("  Tool    (category=tool required):             tool-cat prof-notes\n")
 	b.WriteString("  Treasure (category=treasure required):        treasure-kind\n")
@@ -243,6 +245,7 @@ func BulkFormatSpec() string {
 	b.WriteString("    subcategory source location vault parent\n\n")
 
 	b.WriteString("NAMING COLLISIONS (common points of confusion):\n")
+	b.WriteString("  versatile=  -> two-handed damage die (e.g. 1d8); implies the versatile property\n")
 	b.WriteString("  class=      -> weapon subcategory (e.g. simple-melee); NOT for armor\n")
 	b.WriteString("  armor-class=-> armor base AC; use this for armor, NOT class=\n")
 	b.WriteString("  container=  -> IsContainer boolean flag (true/false)\n")
