@@ -1241,10 +1241,10 @@ func TestWeaponPropertyChipsRenderOnItemDetail(t *testing.T) {
 	}
 
 	data := TemplateData{
-		Categories:  domain.Categories(),
-		Rarities:    domain.Rarities(),
-		AllVaults:   []domain.Vault{},
-		ItemDetail:  application.ItemDetail{Item: longbow},
+		Categories: domain.Categories(),
+		Rarities:   domain.Rarities(),
+		AllVaults:  []domain.Vault{},
+		ItemDetail: application.ItemDetail{Item: longbow},
 	}
 
 	html := renderItemDetail(t, data)

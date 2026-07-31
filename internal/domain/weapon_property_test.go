@@ -275,9 +275,9 @@ func TestEqualWeaponPropertyIsCaseAndSeparatorTolerant(t *testing.T) {
 		{"thrown", "finesse", false},
 		{"", "thrown", false},
 		{"thrown", "", false},
-		{"glowing", "glowing", true},  // unknown values match themselves
-		{"glowing", "GLOWING", true},  // Slugify lowercases, so case variants match even without lookup
-		{"glowing", "shiny", false},   // different unknown values do not match
+		{"glowing", "glowing", true}, // unknown values match themselves
+		{"glowing", "GLOWING", true}, // Slugify lowercases, so case variants match even without lookup
+		{"glowing", "shiny", false},  // different unknown values do not match
 	}
 
 	for _, tc := range cases {
