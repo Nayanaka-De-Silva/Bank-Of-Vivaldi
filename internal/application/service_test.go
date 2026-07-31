@@ -344,6 +344,321 @@ func TestCommitBulkCreatesItems(t *testing.T) {
 	}
 }
 
+// --- PreviewBulk name-resolution tests ---
+
+func TestPreviewBulkResolvesVaultByName(t *testing.T) {
+	store := newFakeStore()
+	store.vaults["vault-1"] = domain.Vault{
+		ID:            "vault-1",
+		CharacterName: "Lyra",
+		StrengthScore: 20,
+	}
+	svc := NewService(store)
+
+	preview, err := svc.PreviewBulk(context.Background(), "Rope | equipment | mundane | 10 | 100 | vault=Lyra", domain.BulkDefaults{})
+	if err != nil {
+		t.Fatalf("PreviewBulk error: %v", err)
+	}
+	if len(preview.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(preview.Rows))
+	}
+	row := preview.Rows[0]
+	if len(row.Errors) > 0 {
+		t.Fatalf("unexpected row errors: %v", row.Errors)
+	}
+	if row.ResolvedVaultID != "vault-1" {
+		t.Errorf("ResolvedVaultID = %q, want \"vault-1\"", row.ResolvedVaultID)
+	}
+}
+
+func TestPreviewBulkRejectsUnknownVaultName(t *testing.T) {
+	store := newFakeStore()
+	svc := NewService(store)
+
+	preview, err := svc.PreviewBulk(context.Background(), "Rope | equipment | mundane | 10 | 100 | vault=Ghost", domain.BulkDefaults{})
+	if err != nil {
+		t.Fatalf("PreviewBulk error: %v", err)
+	}
+	if len(preview.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(preview.Rows))
+	}
+	if len(preview.Rows[0].Errors) == 0 {
+		t.Error("expected row error for unknown vault name, got none")
+	}
+}
+
+func TestPreviewBulkResolvesContainerByName(t *testing.T) {
+	store := newFakeStore()
+	store.items["backpack-1"] = domain.Item{
+		ID:          "backpack-1",
+		Name:        "Backpack",
+		Slug:        "backpack",
+		Category:    "container",
+		Rarity:      domain.RarityMundane,
+		Quantity:    1,
+		IsContainer: true,
+		SourceKind:  domain.SourceKindManual,
+		Location:    domain.ItemLocation{Kind: domain.LocationKindCompendiumRoot},
+	}
+	svc := NewService(store)
+
+	preview, err := svc.PreviewBulk(context.Background(), "Rope | equipment | mundane | 10 | 100 | parent=Backpack", domain.BulkDefaults{})
+	if err != nil {
+		t.Fatalf("PreviewBulk error: %v", err)
+	}
+	if len(preview.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(preview.Rows))
+	}
+	row := preview.Rows[0]
+	if len(row.Errors) > 0 {
+		t.Fatalf("unexpected row errors: %v", row.Errors)
+	}
+	if row.ResolvedContainerID != "backpack-1" {
+		t.Errorf("ResolvedContainerID = %q, want \"backpack-1\"", row.ResolvedContainerID)
+	}
+}
+
+func TestPreviewBulkRejectsNonContainerAsParent(t *testing.T) {
+	store := newFakeStore()
+	store.items["sword-1"] = domain.Item{
+		ID:          "sword-1",
+		Name:        "Sword",
+		Slug:        "sword",
+		Category:    "weapon",
+		Rarity:      domain.RarityMundane,
+		Quantity:    1,
+		IsContainer: false,
+		SourceKind:  domain.SourceKindManual,
+		Location:    domain.ItemLocation{Kind: domain.LocationKindCompendiumRoot},
+	}
+	svc := NewService(store)
+
+	preview, err := svc.PreviewBulk(context.Background(), "Rope | equipment | mundane | 10 | 100 | parent=Sword", domain.BulkDefaults{})
+	if err != nil {
+		t.Fatalf("PreviewBulk error: %v", err)
+	}
+	if len(preview.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(preview.Rows))
+	}
+	if len(preview.Rows[0].Errors) == 0 {
+		t.Error("expected row error for non-container parent, got none")
+	}
+}
+
+// --- CommitBulk per-row override and batch fallback tests ---
+
+func TestCommitBulkRowOverrideBeatsDefault(t *testing.T) {
+	// Row says stackable=false; batch says IsStackable=true — row wins.
+	store := newFakeStore()
+	store.vaults["vault-1"] = domain.Vault{ID: "vault-1", CharacterName: "Lyra", StrengthScore: 20}
+
+	f := false
+	rows := []domain.BulkPreviewRow{{
+		LineNumber:         1,
+		Name:               "Rope",
+		Quantity:           1,
+		Category:           "equipment",
+		Rarity:             domain.RarityMundane,
+		WeightHundredthsLB: 1000,
+		BaseValueCP:        100,
+		IsStackable:        &f,
+	}}
+	bytes, _ := json.Marshal(rows)
+	encoded := base64.StdEncoding.EncodeToString(bytes)
+
+	svc := NewService(store)
+	if err := svc.CommitBulk(context.Background(), BulkCommitInput{
+		EncodedRows:  encoded,
+		LocationKind: domain.LocationKindVaultRoot,
+		VaultID:      "vault-1",
+		IsStackable:  true, // batch default = true, but row override = false
+	}); err != nil {
+		t.Fatalf("commit bulk: %v", err)
+	}
+
+	items, _ := store.ListItems(context.Background())
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	for _, item := range items {
+		if item.IsStackable {
+			t.Errorf("IsStackable = true, want false (row override should win)")
+		}
+	}
+}
+
+func TestCommitBulkBatchFallback(t *testing.T) {
+	// Row has no IsStackable pointer — should fall back to batch default.
+	store := newFakeStore()
+	store.vaults["vault-1"] = domain.Vault{ID: "vault-1", CharacterName: "Lyra", StrengthScore: 20}
+
+	rows := []domain.BulkPreviewRow{{
+		LineNumber:         1,
+		Name:               "Rope",
+		Quantity:           1,
+		Category:           "equipment",
+		Rarity:             domain.RarityMundane,
+		WeightHundredthsLB: 1000,
+		BaseValueCP:        100,
+		// IsStackable is nil (no row override)
+	}}
+	bytes, _ := json.Marshal(rows)
+	encoded := base64.StdEncoding.EncodeToString(bytes)
+
+	svc := NewService(store)
+	if err := svc.CommitBulk(context.Background(), BulkCommitInput{
+		EncodedRows:  encoded,
+		LocationKind: domain.LocationKindVaultRoot,
+		VaultID:      "vault-1",
+		IsStackable:  true,
+	}); err != nil {
+		t.Fatalf("commit bulk: %v", err)
+	}
+
+	items, _ := store.ListItems(context.Background())
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	for _, item := range items {
+		if !item.IsStackable {
+			t.Errorf("IsStackable = false, want true (batch fallback)")
+		}
+	}
+}
+
+func TestCommitBulkResolvedLocationOverride(t *testing.T) {
+	// Row has ResolvedVaultID — it should override the batch VaultID.
+	store := newFakeStore()
+	store.vaults["vault-1"] = domain.Vault{ID: "vault-1", CharacterName: "Lyra", StrengthScore: 20}
+	store.vaults["vault-2"] = domain.Vault{ID: "vault-2", CharacterName: "Zara", StrengthScore: 20}
+
+	rows := []domain.BulkPreviewRow{{
+		LineNumber:      1,
+		Name:            "Dagger",
+		Quantity:        1,
+		Category:        "weapon",
+		Rarity:          domain.RarityMundane,
+		ResolvedVaultID: "vault-2", // row-level override
+	}}
+	bytes, _ := json.Marshal(rows)
+	encoded := base64.StdEncoding.EncodeToString(bytes)
+
+	svc := NewService(store)
+	if err := svc.CommitBulk(context.Background(), BulkCommitInput{
+		EncodedRows:  encoded,
+		LocationKind: domain.LocationKindVaultRoot,
+		VaultID:      "vault-1", // batch default
+	}); err != nil {
+		t.Fatalf("commit bulk: %v", err)
+	}
+
+	items, _ := store.ListItems(context.Background())
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	for _, item := range items {
+		if item.Location.OwnerVaultID != "vault-2" {
+			t.Errorf("OwnerVaultID = %q, want \"vault-2\" (resolved override)", item.Location.OwnerVaultID)
+		}
+	}
+}
+
+func TestCommitBulkWeaponDetailsSurviveRoundTrip(t *testing.T) {
+	store := newFakeStore()
+	store.vaults["vault-1"] = domain.Vault{ID: "vault-1", CharacterName: "Lyra", StrengthScore: 20}
+
+	rows := []domain.BulkPreviewRow{{
+		LineNumber: 1,
+		Name:       "Dagger",
+		Quantity:   1,
+		Category:   "weapon",
+		Rarity:     domain.RarityMundane,
+		Details: domain.ItemDetails{
+			Weapon: &domain.WeaponDetails{
+				DamageDice: "1d4",
+				DamageType: "piercing",
+				Properties: []string{"finesse", "light", "thrown"},
+			},
+		},
+	}}
+	bytes, _ := json.Marshal(rows)
+	encoded := base64.StdEncoding.EncodeToString(bytes)
+
+	svc := NewService(store)
+	if err := svc.CommitBulk(context.Background(), BulkCommitInput{
+		EncodedRows:  encoded,
+		LocationKind: domain.LocationKindVaultRoot,
+		VaultID:      "vault-1",
+	}); err != nil {
+		t.Fatalf("commit bulk: %v", err)
+	}
+
+	items, _ := store.ListItems(context.Background())
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	for _, item := range items {
+		if item.Details.Weapon == nil {
+			t.Fatal("saved item has no WeaponDetails")
+		}
+		if item.Details.Weapon.DamageDice != "1d4" {
+			t.Errorf("DamageDice = %q, want \"1d4\"", item.Details.Weapon.DamageDice)
+		}
+		if len(item.Details.Weapon.Properties) != 3 {
+			t.Errorf("Properties len = %d, want 3", len(item.Details.Weapon.Properties))
+		}
+	}
+}
+
+func TestCommitBulkRejectsUnresolvableRowLocationBeforeCommittingAnything(t *testing.T) {
+	// Row 1 is a normal row with no location override. Row 2 sets
+	// location=vault but names no vault=, and the batch itself has no
+	// default vault selected (LocationKind: compendium, VaultID: ""). This
+	// must fail for row 2 without creating row 1 — CommitBulk isn't
+	// transactional, so the location check has to run as a pre-flight pass
+	// over every row before any SaveItem call, not discover the bad row
+	// mid-loop.
+	store := newFakeStore()
+
+	rows := []domain.BulkPreviewRow{
+		{
+			LineNumber:         1,
+			Name:               "Good Rope",
+			Quantity:           1,
+			Category:           "equipment",
+			Rarity:             domain.RarityMundane,
+			WeightHundredthsLB: 1000,
+			BaseValueCP:        100,
+		},
+		{
+			LineNumber:         2,
+			Name:               "Bad Rope",
+			Quantity:           1,
+			Category:           "equipment",
+			Rarity:             domain.RarityMundane,
+			WeightHundredthsLB: 1000,
+			BaseValueCP:        100,
+			LocationKind:       domain.LocationKindVaultRoot,
+		},
+	}
+	bytes, _ := json.Marshal(rows)
+	encoded := base64.StdEncoding.EncodeToString(bytes)
+
+	svc := NewService(store)
+	err := svc.CommitBulk(context.Background(), BulkCommitInput{
+		EncodedRows:  encoded,
+		LocationKind: domain.LocationKindCompendiumRoot,
+	})
+	if err == nil {
+		t.Fatal("expected error for row with location=vault and no resolvable vault, got nil")
+	}
+
+	items, _ := store.ListItems(context.Background())
+	if len(items) != 0 {
+		t.Fatalf("expected 0 items (nothing committed), got %d: %+v", len(items), items)
+	}
+}
+
 // threeLevelFixture returns a bag → pouch → coins hierarchy rooted at the compendium.
 // bag has MaxWeightHundredthsLB=5000; pouch has 2000; coins weigh 200 each.
 func threeLevelFixture() (bag, pouch, coins domain.Item) {

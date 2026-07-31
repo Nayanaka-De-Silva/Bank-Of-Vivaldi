@@ -31,10 +31,10 @@ func ParseEncumbranceMode(value string) EncumbranceMode {
 type EncumbranceState string
 
 const (
-	EncumbranceStateNormal           EncumbranceState = "normal"
-	EncumbranceStateEncumbered       EncumbranceState = "encumbered"
+	EncumbranceStateNormal            EncumbranceState = "normal"
+	EncumbranceStateEncumbered        EncumbranceState = "encumbered"
 	EncumbranceStateHeavilyEncumbered EncumbranceState = "heavily-encumbered"
-	EncumbranceStateOverCapacity     EncumbranceState = "over-capacity"
+	EncumbranceStateOverCapacity      EncumbranceState = "over-capacity"
 )
 
 type LocationKind string
@@ -72,6 +72,20 @@ func ParseRarity(value string) Rarity {
 	}
 }
 
+// TryParseRarity is the strict counterpart to ParseRarity: it returns the Rarity
+// and true only when value is a recognised rarity string. Unlike ParseRarity it
+// does not fall back to RarityMundane, so callers can distinguish "the user typed
+// a typo" from "the user typed mundane".
+func TryParseRarity(value string) (Rarity, bool) {
+	normalized := Rarity(strings.ToLower(strings.TrimSpace(value)))
+	switch normalized {
+	case RarityMundane, RarityUnknown, RarityCommon, RarityUncommon, RarityRare, RarityVeryRare, RarityLegendary, RarityArtifact:
+		return normalized, true
+	default:
+		return "", false
+	}
+}
+
 type SourceKind string
 
 const (
@@ -87,6 +101,19 @@ func ParseSourceKind(value string) SourceKind {
 		return normalized
 	default:
 		return SourceKindManual
+	}
+}
+
+// TryParseSourceKind is the strict counterpart to ParseSourceKind: it returns
+// the SourceKind and true only when value is a recognised kind. Unlike
+// ParseSourceKind it does not fall back to SourceKindManual.
+func TryParseSourceKind(value string) (SourceKind, bool) {
+	normalized := SourceKind(strings.ToLower(strings.TrimSpace(value)))
+	switch normalized {
+	case SourceKindManual, SourceKindCustom, SourceKindImported:
+		return normalized, true
+	default:
+		return "", false
 	}
 }
 
@@ -157,20 +184,20 @@ type WeaponDetails struct {
 }
 
 type ToolDetails struct {
-	ToolCategory      string `json:"tool_category,omitempty"`
-	ProficiencyNotes  string `json:"proficiency_notes,omitempty"`
+	ToolCategory     string `json:"tool_category,omitempty"`
+	ProficiencyNotes string `json:"proficiency_notes,omitempty"`
 }
 
 type MountDetails struct {
-	MountType                string `json:"mount_type,omitempty"`
-	MovementSpeed            int    `json:"movement_speed,omitempty"`
-	CarryingCapacityHundredthsLB int `json:"carrying_capacity_hundredths_lb,omitempty"`
+	MountType                    string `json:"mount_type,omitempty"`
+	MovementSpeed                int    `json:"movement_speed,omitempty"`
+	CarryingCapacityHundredthsLB int    `json:"carrying_capacity_hundredths_lb,omitempty"`
 }
 
 type VehicleDetails struct {
-	VehicleType              string `json:"vehicle_type,omitempty"`
-	MovementSpeed            int    `json:"movement_speed,omitempty"`
-	CarryingCapacityHundredthsLB int `json:"carrying_capacity_hundredths_lb,omitempty"`
+	VehicleType                  string `json:"vehicle_type,omitempty"`
+	MovementSpeed                int    `json:"movement_speed,omitempty"`
+	CarryingCapacityHundredthsLB int    `json:"carrying_capacity_hundredths_lb,omitempty"`
 }
 
 type TreasureDetails struct {
@@ -284,6 +311,16 @@ func WeaponCategories() []string {
 		"martial-melee",
 		"martial-ranged",
 	}
+}
+
+// IsValidCategory reports whether value is one of the recognised item categories.
+func IsValidCategory(value string) bool {
+	for _, cat := range Categories() {
+		if value == cat {
+			return true
+		}
+	}
+	return false
 }
 
 // IsValidWeaponCategory reports whether value is one of the four allowed weapon categories.
