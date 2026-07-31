@@ -19,33 +19,32 @@
       {{template "item_nodes" .ItemDetail.Children}}
     {{end}}
 
-    <h2>Move item</h2>
-    <form method="post" action="/items/{{.ItemDetail.Item.ID}}/move" class="grid three">
-      <label>Location kind
-        <select name="location_kind">
-          <option value="compendium" {{if eq .ItemDetail.Item.Location.Kind "compendium"}}selected{{end}}>Compendium root</option>
-          <option value="vault" {{if eq .ItemDetail.Item.Location.Kind "vault"}}selected{{end}}>Vault root</option>
-          <option value="container" {{if eq .ItemDetail.Item.Location.Kind "container"}}selected{{end}}>Container</option>
-        </select>
-      </label>
-      <label>Vault
-        <select name="vault_id">
-          <option value="">--</option>
-          {{range .AllVaults}}
-            <option value="{{.ID}}" {{if eq $.ItemDetail.Item.Location.OwnerVaultID .ID}}selected{{end}}>{{.CharacterName}}</option>
-          {{end}}
-        </select>
-      </label>
-      <label>Container
-        <select name="parent_container_item_id">
-          <option value="">--</option>
-          {{range .ContainerOptions}}
-            <option value="{{.ID}}" {{if eq $.ItemDetail.Item.Location.ParentContainerItemID .ID}}selected{{end}}>{{.Name}}</option>
-          {{end}}
-        </select>
-      </label>
-      <div class="grid-span"><button type="submit">Move item</button></div>
-    </form>
+    <div class="item-actions">
+      <button type="button" class="dialog-trigger" data-dialog-open="move-dialog" hidden>Move item…</button>
+      <button type="button" class="dialog-trigger" data-dialog-open="copy-dialog" hidden>Copy item…</button>
+    </div>
+
+    <dialog id="move-dialog" aria-labelledby="move-dialog-title" open>
+      <form method="post" action="/items/{{.ItemDetail.Item.ID}}/move" class="stack">
+        <h2 id="move-dialog-title">Move item</h2>
+        {{template "location_fields" .}}
+        <div class="dialog-actions">
+          <button type="button" class="dialog-cancel" data-dialog-close>Cancel</button>
+          <button type="submit">Move item</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="copy-dialog" aria-labelledby="copy-dialog-title" open>
+      <form method="post" action="/items/{{.ItemDetail.Item.ID}}/copy" class="stack">
+        <h2 id="copy-dialog-title">Copy item</h2>
+        {{template "location_fields" .}}
+        <div class="dialog-actions">
+          <button type="button" class="dialog-cancel" data-dialog-close>Cancel</button>
+          <button type="submit">Copy item</button>
+        </div>
+      </form>
+    </dialog>
 
     {{if .ItemDetail.Item.IsStackable}}
       <h2>Split stack</h2>
@@ -68,9 +67,47 @@
       {{end}}
     {{end}}
 
-    <form method="post" action="/items/{{.ItemDetail.Item.ID}}/delete" onsubmit="return confirm('Delete this item?');">
-      <button type="submit" class="danger">Delete item</button>
-    </form>
+    <div class="item-actions">
+      <button type="button" class="dialog-trigger danger" data-dialog-open="delete-dialog" hidden>Delete item…</button>
+    </div>
+
+    <dialog id="delete-dialog" aria-labelledby="delete-dialog-title" open>
+      <form method="post" action="/items/{{.ItemDetail.Item.ID}}/delete" class="stack">
+        <h2 id="delete-dialog-title">Delete item</h2>
+        <p>This will permanently delete "{{.ItemDetail.Item.Name}}". This cannot be undone.</p>
+        <div class="dialog-actions">
+          <button type="button" class="dialog-cancel" data-dialog-close autofocus>Cancel</button>
+          <button type="submit" class="danger">Delete item</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script>
+    (() => {
+      const dialogs = Array.from(document.querySelectorAll("dialog"));
+      if (!dialogs.length || typeof HTMLDialogElement === "undefined") return;
+
+      // Dialogs ship `open` in markup so the forms still submit without JS. Once
+      // scripting is confirmed, close them and reveal the triggers that drive showModal().
+      dialogs.forEach((dialog) => dialog.open && dialog.close());
+      document.querySelectorAll("[data-dialog-open]").forEach((trigger) => {
+        const dialog = document.getElementById(trigger.dataset.dialogOpen);
+        if (!dialog) return;
+        trigger.hidden = false;
+        trigger.addEventListener("click", () => dialog.showModal());
+        // Programmatic closes do not always return focus, so restore it explicitly.
+        dialog.addEventListener("close", () => trigger.focus());
+      });
+      document.querySelectorAll("[data-dialog-close]").forEach((button) => {
+        button.addEventListener("click", () => button.closest("dialog").close());
+      });
+      // A backdrop click targets the dialog element itself, never its contents.
+      dialogs.forEach((dialog) =>
+        dialog.addEventListener("click", (event) => {
+          if (event.target === dialog) dialog.close();
+        }));
+    })();
+    </script>
   </article>
 
   <article class="panel">

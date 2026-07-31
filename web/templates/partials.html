@@ -51,6 +51,79 @@
 </ul>
 {{end}}
 
+{{define "location_fields"}}
+<div class="grid three">
+  <label>Location kind
+    <select name="location_kind">
+      <option value="compendium" {{if eq .SelectedLocationKind "compendium"}}selected{{end}}>Compendium root</option>
+      <option value="vault" {{if eq .SelectedLocationKind "vault"}}selected{{end}}>Vault root</option>
+      <option value="container" {{if eq .SelectedLocationKind "container"}}selected{{end}}>Container</option>
+    </select>
+  </label>
+  <label>Vault
+    <select name="vault_id" {{if eq .SelectedLocationKind "compendium"}}disabled{{end}}>
+      <option value="">--</option>
+      {{range .AllVaults}}
+        <option value="{{.ID}}" {{if eq $.SelectedVaultID .ID}}selected{{end}}>{{.CharacterName}}</option>
+      {{end}}
+    </select>
+  </label>
+  <label>Container
+    <select name="parent_container_item_id" {{if ne .SelectedLocationKind "container"}}disabled{{end}}>
+      <option value="">--</option>
+      {{range .ContainerOptions}}
+        <option value="{{.ID}}" {{if eq $.SelectedParentContainerID .ID}}selected{{end}} data-vault-id="{{.Location.OwnerVaultID}}"{{if ne .Location.OwnerVaultID $.SelectedVaultID}} hidden disabled{{end}}>{{.Name}}</option>
+      {{end}}
+    </select>
+  </label>
+</div>
+
+<script>
+(() => {
+  const form = document.currentScript.closest("form");
+  if (!form) return;
+
+  const locationKindSelect = form.querySelector('select[name="location_kind"]');
+  const vaultSelect = form.querySelector('select[name="vault_id"]');
+  const containerSelect = form.querySelector('select[name="parent_container_item_id"]');
+  if (!locationKindSelect || !vaultSelect || !containerSelect) return;
+
+  const syncLocationFields = () => {
+    const kind = locationKindSelect.value;
+
+    // Disable vault select for compendium kind; clear its value when disabling.
+    vaultSelect.disabled = kind === "compendium";
+    if (kind === "compendium") {
+      vaultSelect.value = "";
+    }
+
+    // Disable container select when kind is not container.
+    containerSelect.disabled = kind !== "container";
+
+    // Filter container options to only show containers belonging to the selected vault.
+    const selectedVaultID = vaultSelect.value;
+    let selectedContainerHidden = false;
+    Array.from(containerSelect.options).forEach((option) => {
+      if (option.value === "") return;
+      const match = option.dataset.vaultId === selectedVaultID;
+      option.hidden = !match;
+      option.disabled = !match;
+      if (!match && option.selected) {
+        selectedContainerHidden = true;
+      }
+    });
+    if (selectedContainerHidden) {
+      containerSelect.value = "";
+    }
+  };
+
+  locationKindSelect.addEventListener("change", syncLocationFields);
+  vaultSelect.addEventListener("change", syncLocationFields);
+  syncLocationFields();
+})();
+</script>
+{{end}}
+
 {{define "item_nodes"}}
 <ul class="item-tree">
   {{range .}}

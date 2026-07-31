@@ -431,3 +431,44 @@ td .rarity-label {
   color: var(--rarity, var(--text));
   font-weight: 600;
 }
+
+/* Action dialogs (move / copy / delete) on the item screen. */
+dialog {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+/* Dialogs ship with `open` in markup so the forms still submit without JS. The UA
+   sheet absolutely positions open dialogs, which would rip them out of the panel
+   flow, so the non-modal fallback is pinned back into normal document flow. */
+dialog:not(:modal) {
+  position: static;
+  width: auto;
+  max-width: none;
+  margin: 1rem 0;
+}
+dialog:modal {
+  width: min(32rem, 92vw);
+}
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+.dialog-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+/* Cancel is a secondary action, so it drops the accent fill the base button carries. */
+.dialog-cancel {
+  background: var(--panel-2);
+  color: var(--text);
+}
+.item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}

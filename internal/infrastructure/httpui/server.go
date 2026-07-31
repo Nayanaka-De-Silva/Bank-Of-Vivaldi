@@ -481,6 +481,8 @@ func (s *Server) handleItemRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleItemDelete(w, r)
 	case strings.HasSuffix(r.URL.Path, "/move"):
 		s.handleItemMove(w, r)
+	case strings.HasSuffix(r.URL.Path, "/copy"):
+		s.handleItemCopy(w, r)
 	case strings.HasSuffix(r.URL.Path, "/split"):
 		s.handleItemSplit(w, r)
 	case strings.HasSuffix(r.URL.Path, "/merge"):
@@ -570,6 +572,26 @@ func (s *Server) handleItemMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/items/"+id+"?notice=Item+moved", http.StatusSeeOther)
+}
+
+func (s *Server) handleItemCopy(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := pathSegment(strings.TrimSuffix(r.URL.Path, "/copy"), "/items/")
+	location := domain.ItemLocation{
+		Kind:                  domain.LocationKind(r.FormValue("location_kind")),
+		OwnerVaultID:          strings.TrimSpace(r.FormValue("vault_id")),
+		ParentContainerItemID: strings.TrimSpace(r.FormValue("parent_container_item_id")),
+	}
+	copied, err := s.service.CopyItem(r.Context(), id, location)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	http.Redirect(w, r, "/items/"+copied.ID+"?notice=Item+copied", http.StatusSeeOther)
 }
 
 func (s *Server) handleItemSplit(w http.ResponseWriter, r *http.Request) {
