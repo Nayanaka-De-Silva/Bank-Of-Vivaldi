@@ -231,7 +231,7 @@ func BulkFormatSpec() string {
 	b.WriteString("\n")
 
 	b.WriteString("Attribute keys by category:\n")
-	b.WriteString("  Weapon  (category=weapon required):           damage dtype props class range\n")
+	b.WriteString("  Weapon  (category=weapon required):           damage dtype props class range versatile\n")
 	b.WriteString("  Armor   (category=armor required):            armor-class ac dex-mod str-req stealth-dis\n")
 	b.WriteString("  Tool    (category=tool required):             tool-cat prof-notes\n")
 	b.WriteString("  Treasure (category=treasure required):        treasure-kind\n")

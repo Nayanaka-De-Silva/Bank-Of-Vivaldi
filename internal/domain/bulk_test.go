@@ -251,6 +251,38 @@ func TestParseBulkItemInputWeaponAttributeOnWrongCategory(t *testing.T) {
 	}
 }
 
+func TestParseBulkItemInputVersatileAttribute(t *testing.T) {
+	// versatile= on a weapon row must set VersatileDamageDice.
+	preview := ParseBulkItemInput(
+		"Quarterstaff | weapon | mundane | 4 | 2sp | A sturdy staff. | damage=1d6 | versatile=1d8 | props=versatile",
+		BulkDefaults{},
+	)
+	if len(preview.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(preview.Rows))
+	}
+	row := preview.Rows[0]
+	if len(row.Errors) > 0 {
+		t.Fatalf("unexpected errors: %v", row.Errors)
+	}
+	if row.Details.Weapon == nil {
+		t.Fatal("WeaponDetails is nil")
+	}
+	if row.Details.Weapon.VersatileDamageDice != "1d8" {
+		t.Errorf("VersatileDamageDice = %q, want \"1d8\"", row.Details.Weapon.VersatileDamageDice)
+	}
+}
+
+func TestParseBulkItemInputVersatileAttributeOnWrongCategory(t *testing.T) {
+	// versatile= on a non-weapon category must produce a row error.
+	preview := ParseBulkItemInput("Cloak | equipment | mundane | 1 | 50gp | versatile=1d8", BulkDefaults{})
+	if len(preview.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(preview.Rows))
+	}
+	if len(preview.Rows[0].Errors) == 0 {
+		t.Error("expected error for versatile attribute on non-weapon category, got none")
+	}
+}
+
 // --- Per-row boolean overrides (pointer bools) ---
 
 func TestParseBulkItemInputPerRowBoolOverrides(t *testing.T) {

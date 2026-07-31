@@ -947,16 +947,18 @@ func parseItemDetails(r *http.Request, category string, isContainer bool) (domai
 		// when invalid) because legacy free-text properties re-submit via pre-checked form entries
 		// and must survive a save without being silently dropped.
 		properties := domain.NormalizeWeaponProperties(r.Form["weapon_properties"])
-		// Set Weapon when either the class or at least one property is present, so
-		// properties are not lost when the user leaves the category dropdown empty.
-		if weaponClass != "" || len(properties) > 0 {
+		// Set Weapon when the class, any property, or a versatile die is present, so
+		// none of them are lost when the user leaves the category dropdown empty.
+		versatileDamageDice := strings.TrimSpace(r.FormValue("weapon_versatile_damage_dice"))
+		if weaponClass != "" || len(properties) > 0 || versatileDamageDice != "" {
 			details.Weapon = &domain.WeaponDetails{
-				WeaponClass: weaponClass,
-				DamageDice:  r.FormValue("weapon_damage_dice"),
-				DamageType:  r.FormValue("weapon_damage_type"),
-				Properties:  properties,
-				NormalRange: normalRange,
-				LongRange:   longRange,
+				WeaponClass:         weaponClass,
+				DamageDice:          r.FormValue("weapon_damage_dice"),
+				DamageType:          r.FormValue("weapon_damage_type"),
+				Properties:          properties,
+				NormalRange:         normalRange,
+				LongRange:           longRange,
+				VersatileDamageDice: versatileDamageDice,
 			}
 		}
 	}

@@ -13,7 +13,7 @@ import (
 // TestBulkFormatSpecCoversVocabulary ensures that the spec cannot drift.
 var bulkKnownKeys = map[string]bool{
 	// Weapon (category=weapon required).
-	"damage": true, "dtype": true, "props": true, "class": true, "range": true,
+	"damage": true, "dtype": true, "props": true, "class": true, "range": true, "versatile": true,
 	// Armor (category=armor required).
 	"armor-class": true, "ac": true, "dex-mod": true, "str-req": true, "stealth-dis": true,
 	// Tool (category=tool required).
@@ -37,7 +37,7 @@ var bulkKnownKeys = map[string]bool{
 func BulkAttributeKeys() []string {
 	return []string{
 		// Weapon
-		"damage", "dtype", "props", "class", "range",
+		"damage", "dtype", "props", "class", "range", "versatile",
 		// Armor
 		"armor-class", "ac", "dex-mod", "str-req", "stealth-dis",
 		// Tool
@@ -190,6 +190,15 @@ func applyBulkAttribute(seg string, row *BulkPreviewRow) (keyShaped bool, err er
 			}
 			row.Details.Weapon.NormalRange = normal
 		}
+
+	case "versatile":
+		if row.Category != "weapon" {
+			return true, fmt.Errorf("attribute %q requires category \"weapon\", got %q", key, row.Category)
+		}
+		if row.Details.Weapon == nil {
+			row.Details.Weapon = &WeaponDetails{}
+		}
+		row.Details.Weapon.VersatileDamageDice = val
 
 	// --- Armor attributes (require category=armor) ---
 

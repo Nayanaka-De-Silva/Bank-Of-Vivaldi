@@ -175,12 +175,13 @@ type ArmorDetails struct {
 }
 
 type WeaponDetails struct {
-	WeaponClass string   `json:"weapon_class,omitempty"`
-	DamageDice  string   `json:"damage_dice,omitempty"`
-	DamageType  string   `json:"damage_type,omitempty"`
-	Properties  []string `json:"properties,omitempty"`
-	NormalRange int      `json:"normal_range,omitempty"`
-	LongRange   int      `json:"long_range,omitempty"`
+	WeaponClass         string   `json:"weapon_class,omitempty"`
+	DamageDice          string   `json:"damage_dice,omitempty"`
+	DamageType          string   `json:"damage_type,omitempty"`
+	Properties          []string `json:"properties,omitempty"`
+	NormalRange         int      `json:"normal_range,omitempty"`
+	LongRange           int      `json:"long_range,omitempty"`
+	VersatileDamageDice string   `json:"versatile_damage_dice,omitempty"`
 }
 
 type ToolDetails struct {
