@@ -104,6 +104,25 @@ func TestParseBulkItemInput(t *testing.T) {
 	}
 }
 
+func TestCloneItemDetailsIsDeep(t *testing.T) {
+	src := ItemDetails{
+		Container: &ContainerDetails{MaxWeightHundredthsLB: 500},
+		Weapon:    &WeaponDetails{Properties: []string{"finesse", "light"}},
+	}
+
+	clone := CloneItemDetails(src)
+
+	clone.Container.MaxWeightHundredthsLB = 9999
+	clone.Weapon.Properties[0] = "heavy"
+
+	if src.Container.MaxWeightHundredthsLB != 500 {
+		t.Fatalf("CloneItemDetails shared Container pointer: source mutated to %d", src.Container.MaxWeightHundredthsLB)
+	}
+	if src.Weapon.Properties[0] != "finesse" {
+		t.Fatalf("CloneItemDetails shared Weapon.Properties slice: source mutated to %q", src.Weapon.Properties[0])
+	}
+}
+
 func TestItemsMergeable(t *testing.T) {
 	a := Item{
 		ID:                 "a",

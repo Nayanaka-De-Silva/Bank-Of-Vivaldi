@@ -641,6 +641,171 @@ func TestItemFormLocationScriptContainsSyncLogic(t *testing.T) {
 	}
 }
 
+func TestLocationFieldsPartialRendersTheThreeSelects(t *testing.T) {
+	t.Parallel()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	var rendered bytes.Buffer
+	err = server.tmpl.ExecuteTemplate(&rendered, "location_fields", TemplateData{
+		SelectedLocationKind: string(domain.LocationKindContainer),
+		SelectedVaultID:      "vault-1",
+		AllVaults: []domain.Vault{
+			{ID: "vault-1", CharacterName: "Aragorn"},
+		},
+		ContainerOptions: []domain.Item{
+			{ID: "c1", Name: "Chest", Location: domain.ItemLocation{OwnerVaultID: "vault-1"}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("render location_fields: %v", err)
+	}
+
+	html := rendered.String()
+	for _, want := range []string{
+		`name="location_kind"`,
+		`name="vault_id"`,
+		`name="parent_container_item_id"`,
+		`data-vault-id="vault-1"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected location_fields to contain %q, got:\n%s", want, html)
+		}
+	}
+}
+
+func renderItemDetailFromItem(t *testing.T, item domain.Item) string {
+	t.Helper()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	var rendered bytes.Buffer
+	err = server.tmpl.ExecuteTemplate(&rendered, "item_detail", TemplateData{
+		ItemDetail:           application.ItemDetail{Item: item},
+		Item:                 item,
+		Categories:           domain.Categories(),
+		Rarities:             domain.Rarities(),
+		SelectedLocationKind: string(item.Location.Kind),
+		SelectedVaultID:      item.Location.OwnerVaultID,
+	})
+	if err != nil {
+		t.Fatalf("render item detail: %v", err)
+	}
+	return rendered.String()
+}
+
+func TestItemDetailRendersMoveCopyAndDeleteDialogs(t *testing.T) {
+	t.Parallel()
+
+	html := renderItemDetailFromItem(t, domain.Item{ID: "item-1", Name: "Rope"})
+	for _, want := range []string{`id="move-dialog"`, `id="copy-dialog"`, `id="delete-dialog"`, "<dialog"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected item detail to render %q, got:\n%s", want, html)
+		}
+	}
+}
+
+func TestItemCopyDialogPostsToCopyRoute(t *testing.T) {
+	t.Parallel()
+
+	html := renderItemDetailFromItem(t, domain.Item{ID: "item-1", Name: "Rope"})
+	if !strings.Contains(html, `action="/items/item-1/copy"`) {
+		t.Fatalf("expected copy dialog to post to /items/item-1/copy, got:\n%s", html)
+	}
+}
+
+func TestItemMoveDialogStillPostsToMoveRoute(t *testing.T) {
+	t.Parallel()
+
+	html := renderItemDetailFromItem(t, domain.Item{ID: "item-1", Name: "Rope"})
+	if !strings.Contains(html, `action="/items/item-1/move"`) {
+		t.Fatalf("expected move dialog to post to /items/item-1/move, got:\n%s", html)
+	}
+}
+
+func TestItemDeleteDialogReplacesNativeConfirm(t *testing.T) {
+	t.Parallel()
+
+	html := renderItemDetailFromItem(t, domain.Item{ID: "item-1", Name: "Rope"})
+	if !strings.Contains(html, `id="delete-dialog"`) {
+		t.Fatalf("expected a delete dialog, got:\n%s", html)
+	}
+	if strings.Contains(html, "confirm(") {
+		t.Fatalf("expected native confirm() to be replaced by the delete dialog, got:\n%s", html)
+	}
+}
+
+func TestItemDetailReusesLocationFieldsInBothDialogs(t *testing.T) {
+	t.Parallel()
+
+	html := renderItemDetailFromItem(t, domain.Item{ID: "item-1", Name: "Rope"})
+	// Edit form + move dialog + copy dialog: proof the picker is a shared
+	// partial rather than pasted markup drifting out of sync. Matching the
+	// opening tag (not the bare attribute) avoids also counting the JS
+	// selector string 'select[name="location_kind"]' in each copy's script.
+	if got := strings.Count(html, `<select name="location_kind">`); got != 3 {
+		t.Fatalf("expected location_kind select to appear 3 times, got %d in:\n%s", got, html)
+	}
+}
+
+func TestItemDialogsRemainUsableWithoutScript(t *testing.T) {
+	t.Parallel()
+
+	html := renderItemDetailFromItem(t, domain.Item{ID: "item-1", Name: "Rope"})
+	for _, dialog := range []string{"move-dialog", "copy-dialog", "delete-dialog"} {
+		if !strings.Contains(html, `id="`+dialog+`" aria-labelledby="`+dialog+`-title" open`) {
+			t.Fatalf("expected %s to render with the open attribute for the no-JS fallback, got:\n%s", dialog, html)
+		}
+	}
+	if !strings.Contains(html, "dialog.close()") {
+		t.Fatalf("expected dialog script to close dialogs once scripting is confirmed, got:\n%s", html)
+	}
+	if !strings.Contains(html, "trigger.hidden = false") {
+		t.Fatalf("expected dialog script to reveal triggers once scripting is confirmed, got:\n%s", html)
+	}
+}
+
+func TestItemDialogScriptWiresModalBehaviour(t *testing.T) {
+	t.Parallel()
+
+	html := renderItemDetailFromItem(t, domain.Item{ID: "item-1", Name: "Rope"})
+	for _, want := range []string{
+		"showModal()",
+		"data-dialog-open",
+		"data-dialog-close",
+		"event.target === dialog",
+		"trigger.focus()",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("expected dialog script to contain %q, got:\n%s", want, html)
+		}
+	}
+}
+
+func TestStylesheetStylesActionDialogs(t *testing.T) {
+	t.Parallel()
+
+	stylesheet := readStylesheet(t)
+	for _, declaration := range []string{
+		"dialog {",
+		"dialog::backdrop {",
+		"dialog:not(:modal) {",
+		"position: static;",
+		".dialog-actions {",
+		"background: var(--panel);",
+	} {
+		if !strings.Contains(stylesheet, declaration) {
+			t.Fatalf("expected stylesheet to style action dialogs via %q", declaration)
+		}
+	}
+}
+
 func TestItemFormWeaponCategoryRendersFourOptions(t *testing.T) {
 	t.Parallel()
 

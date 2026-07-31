@@ -17,7 +17,7 @@ func ComputeCoinWeightHundredthsLB(p Purse) int {
 	if coins == 0 {
 		return 0
 	}
-	return (coins * 100 + 49) / 50
+	return (coins*100 + 49) / 50
 }
 
 func GetEncumbranceState(totalWeightHundredths int, vault Vault) EncumbranceState {
@@ -190,6 +190,12 @@ func CloneItems(items []Item) []Item {
 	cloned := make([]Item, len(items))
 	copy(cloned, items)
 	return cloned
+}
+
+// CloneItemDetails returns a deep copy of d via JSON round-trip, so that any
+// pointer field added later is automatically handled without changing this code.
+func CloneItemDetails(d ItemDetails) ItemDetails {
+	return normalizeDetails(d)
 }
 
 func normalizeDetails(details ItemDetails) ItemDetails {

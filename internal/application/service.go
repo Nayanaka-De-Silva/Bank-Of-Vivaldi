@@ -65,11 +65,11 @@ type ItemNode struct {
 }
 
 type DashboardData struct {
-	Settings             domain.AppSettings
-	Vaults               []VaultSummary
-	CompendiumWeight     int
-	CompendiumValueCP    int
-	CompendiumRootItems  []ItemNode
+	Settings            domain.AppSettings
+	Vaults              []VaultSummary
+	CompendiumWeight    int
+	CompendiumValueCP   int
+	CompendiumRootItems []ItemNode
 }
 
 type VaultDetail struct {
@@ -141,11 +141,11 @@ type UpdateVaultInput struct {
 }
 
 type BulkCommitInput struct {
-	EncodedRows            string
-	LocationKind           domain.LocationKind
-	VaultID                string
-	ParentContainerItemID  string
-	IsStackable            bool
+	EncodedRows           string
+	LocationKind          domain.LocationKind
+	VaultID               string
+	ParentContainerItemID string
+	IsStackable           bool
 }
 
 func (s *Service) Settings(ctx context.Context) (domain.AppSettings, error) {
@@ -169,9 +169,9 @@ func (s *Service) Dashboard(ctx context.Context) (DashboardData, error) {
 	}
 
 	data := DashboardData{
-		Settings:         settings,
-		Vaults:           summarizeVaults(vaults, items),
-		CompendiumWeight: domain.ComputeCompendiumWeightHundredths(items),
+		Settings:          settings,
+		Vaults:            summarizeVaults(vaults, items),
+		CompendiumWeight:  domain.ComputeCompendiumWeightHundredths(items),
 		CompendiumValueCP: domain.ComputeCompendiumValueCP(items),
 	}
 
@@ -380,7 +380,7 @@ func (s *Service) SaveItem(ctx context.Context, input SaveItemInput) (domain.Ite
 	if err != nil {
 		return domain.Item{}, err
 	}
-	if err := s.validateSimulation(simulated, item); err != nil {
+	if err := s.validateSimulation(ctx, simulated, item); err != nil {
 		return domain.Item{}, err
 	}
 
@@ -464,6 +464,109 @@ func (s *Service) MoveItem(ctx context.Context, itemID string, location domain.I
 	}
 	item.Location = location
 	return s.SaveItem(ctx, toSaveInput(item))
+}
+
+// CopyItem deep-copies the item subtree rooted at itemID and places the root
+// clone at location. The full subtree is validated as a single unit before any
+// row is written — a per-node approach would commit partial subtrees and leave
+// orphans if a later node fails capacity checks. With no Store transaction this
+// call is not atomic: a process death mid-write can leave orphaned rows, but
+// persistClones attempts best-effort cleanup on error.
+func (s *Service) CopyItem(ctx context.Context, itemID string, location domain.ItemLocation) (domain.Item, error) {
+	allItems, err := s.store.ListItems(ctx)
+	if err != nil {
+		return domain.Item{}, err
+	}
+
+	src, ok := findItem(allItems, itemID)
+	if !ok {
+		return domain.Item{}, fmt.Errorf("item not found")
+	}
+
+	now := s.now().UTC()
+	_, childrenMap := domain.BuildItemIndexes(allItems)
+	// build clone tree in pre-order so parent IDs are known before children
+	clones := cloneSubtree(src, "", childrenMap, now, map[string]bool{})
+
+	clones[0].Location = location
+	if err := clones[0].Validate(); err != nil {
+		return domain.Item{}, err
+	}
+	if err := s.resolveLocation(&clones[0], allItems); err != nil {
+		return domain.Item{}, err
+	}
+	if err := s.validateCircularMove(clones[0], allItems); err != nil {
+		return domain.Item{}, err
+	}
+
+	// propagate resolved vault owner to every descendant clone (O(n), no fixpoint loop needed)
+	for i := range clones[1:] {
+		clones[i+1].Location.OwnerVaultID = clones[0].Location.OwnerVaultID
+	}
+
+	simulated := append(domain.CloneItems(allItems), clones...)
+	// validate all clones as one unit — prevents partial-subtree capacity bypasses
+	if err := s.validateSimulationForItems(ctx, simulated, clones); err != nil {
+		return domain.Item{}, err
+	}
+
+	if err := s.persistClones(ctx, clones); err != nil {
+		return domain.Item{}, err
+	}
+
+	return clones[0], nil
+}
+
+// cloneSubtree recursively builds a pre-order slice of deep-copied items.
+// parentCloneID is empty for the root; descendants get the new parent's ID so
+// the pre-order slice satisfies the parent-before-child FK constraint.
+func cloneSubtree(src domain.Item, parentCloneID string, children map[string][]domain.Item, now time.Time, visited map[string]bool) []domain.Item {
+	if visited[src.ID] {
+		return nil
+	}
+	visited[src.ID] = true
+
+	clone := src
+	clone.ID = uuid.NewString()
+	clone.Details = domain.CloneItemDetails(src.Details)
+	clone.CreatedAt = now
+	clone.UpdatedAt = now
+	clone.IsEquipped = false
+	if parentCloneID != "" {
+		clone.Location = domain.ItemLocation{
+			Kind:                  domain.LocationKindContainer,
+			ParentContainerItemID: parentCloneID,
+		}
+	}
+
+	result := []domain.Item{clone}
+	for _, child := range children[src.ID] {
+		result = append(result, cloneSubtree(child, clone.ID, children, now, visited)...)
+	}
+	return result
+}
+
+// persistClones writes clones to the store in the order given (pre-order, satisfying FK).
+// On any failure it deletes already-created rows in reverse order; if cleanup itself
+// fails, the IDs of surviving rows are included in the returned error.
+func (s *Service) persistClones(ctx context.Context, clones []domain.Item) error {
+	created := make([]string, 0, len(clones))
+	for _, clone := range clones {
+		if _, err := s.store.CreateItem(ctx, clone); err != nil {
+			var orphaned []string
+			for i := len(created) - 1; i >= 0; i-- {
+				if cleanupErr := s.store.DeleteItem(ctx, created[i]); cleanupErr != nil {
+					orphaned = append(orphaned, created[i])
+				}
+			}
+			if len(orphaned) > 0 {
+				return fmt.Errorf("persist failed (%w); orphaned rows: %v", err, orphaned)
+			}
+			return err
+		}
+		created = append(created, clone.ID)
+	}
+	return nil
 }
 
 func (s *Service) SplitStack(ctx context.Context, itemID string, quantity int) error {
@@ -853,10 +956,26 @@ func (s *Service) persistDescendantLocationUpdates(ctx context.Context, original
 	return nil
 }
 
-func (s *Service) validateSimulation(items []domain.Item, target domain.Item) error {
-	if target.Location.Kind == domain.LocationKindContainer {
-		byID, children := domain.BuildItemIndexes(items)
-		container, ok := byID[target.Location.ParentContainerItemID]
+func (s *Service) validateSimulationForItems(ctx context.Context, items []domain.Item, targets []domain.Item) error {
+	byID, children := domain.BuildItemIndexes(items)
+
+	parentIDs := map[string]struct{}{}
+	containerIDs := map[string]struct{}{}
+	vaultIDs := map[string]struct{}{}
+	for _, target := range targets {
+		if target.Location.Kind == domain.LocationKindContainer {
+			parentIDs[target.Location.ParentContainerItemID] = struct{}{}
+		}
+		if target.IsContainer {
+			containerIDs[target.ID] = struct{}{}
+		}
+		if target.Location.OwnerVaultID != "" {
+			vaultIDs[target.Location.OwnerVaultID] = struct{}{}
+		}
+	}
+
+	for id := range parentIDs {
+		container, ok := byID[id]
 		if !ok {
 			return fmt.Errorf("target container not found")
 		}
@@ -865,18 +984,18 @@ func (s *Service) validateSimulation(items []domain.Item, target domain.Item) er
 		}
 	}
 
-	if target.IsContainer {
-		byID, children := domain.BuildItemIndexes(items)
-		container, ok := byID[target.ID]
-		if ok {
-			if err := domain.ValidateContainerCapacity(container, domain.ComputeContainedWeightHundredths(container.ID, byID, children)); err != nil {
-				return err
-			}
+	for id := range containerIDs {
+		container, ok := byID[id]
+		if !ok {
+			continue
+		}
+		if err := domain.ValidateContainerCapacity(container, domain.ComputeContainedWeightHundredths(container.ID, byID, children)); err != nil {
+			return err
 		}
 	}
 
-	if target.Location.OwnerVaultID != "" {
-		vault, err := s.store.GetVault(context.Background(), target.Location.OwnerVaultID)
+	for id := range vaultIDs {
+		vault, err := s.store.GetVault(ctx, id)
 		if err != nil {
 			return err
 		}
@@ -887,6 +1006,10 @@ func (s *Service) validateSimulation(items []domain.Item, target domain.Item) er
 	}
 
 	return nil
+}
+
+func (s *Service) validateSimulation(ctx context.Context, items []domain.Item, target domain.Item) error {
+	return s.validateSimulationForItems(ctx, items, []domain.Item{target})
 }
 
 func (s *Service) locationLabel(item domain.Item, allItems []domain.Item) string {
