@@ -29,7 +29,9 @@ type TemplateData struct {
 	Vaults                    []application.VaultSummary
 	VaultDetail               application.VaultDetail
 	ItemDetail                application.ItemDetail
-	CompendiumItems           []application.ItemNode
+	Compendium                application.CompendiumBrowse
+	CompendiumFilters         application.CompendiumFilters
+	CompendiumView            string
 	SearchResults             []application.SearchResult
 	BulkPreview               domain.BulkPreview
 	BulkText                  string
@@ -64,6 +66,12 @@ func itemMetadataVisible(category, metadataCategory string) bool {
 	return normalizeItemFormCategory(category) == strings.ToLower(strings.TrimSpace(metadataCategory))
 }
 
+// rarityClass turns a rarity into a CSS modifier class so cards and badges can be
+// colour-coded per rarity tier.
+func rarityClass(value any) string {
+	return "rarity-" + domain.Slugify(fmt.Sprint(value))
+}
+
 func containerMetadataVisible(category string, isContainer bool) bool {
 	return isContainer || itemMetadataVisible(category, "container")
 }
@@ -73,10 +81,11 @@ func NewServer(service *application.Service) (*Server, error) {
 		"eq":                       func(a, b any) bool { return fmt.Sprint(a) == fmt.Sprint(b) },
 		"weight":                   func(value int) string { return domain.FormatWeightHundredths(value) },
 		"gp":                       func(value int) string { return domain.FormatCopperAsGold(value) },
-			"breakdownCP":              domain.BreakdownCP,
+		"breakdownCP":              domain.BreakdownCP,
 		"humanize":                 func(value any) string { return domain.HumanizeLabel(fmt.Sprint(value)) },
 		"itemFormCategory":         normalizeItemFormCategory,
 		"weaponCategories":         domain.WeaponCategories,
+		"rarityClass":              rarityClass,
 		"itemMetadataVisible":      itemMetadataVisible,
 		"containerMetadataVisible": containerMetadataVisible,
 		"contains": func(haystack, needle string) bool {
@@ -295,18 +304,89 @@ func (s *Server) handleVaultPurse(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCompendium(w http.ResponseWriter, r *http.Request) {
-	items, settings, err := s.service.ListCompendium(r.Context())
+	filters := parseCompendiumFilters(r)
+	view := normalizeCompendiumView(r.URL.Query().Get("view"))
+
+	browse, err := s.service.BrowseCompendium(r.Context(), filters)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// A malformed filter value is user error, not a server fault: re-render the
+		// browser with the message so the DM can correct the field.
+		settings, settingsErr := s.service.Settings(r.Context())
+		if settingsErr != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		s.render(w, "compendium", http.StatusBadRequest, TemplateData{
+			Title:             "Compendium",
+			Error:             err.Error(),
+			AppSettings:       settings,
+			Categories:        domain.Categories(),
+			Rarities:          domain.Rarities(),
+			CompendiumFilters: filters,
+			CompendiumView:    view,
+		})
 		return
 	}
 
 	s.render(w, "compendium", http.StatusOK, TemplateData{
-		Title:           "Compendium",
-		Notice:          r.URL.Query().Get("notice"),
-		AppSettings:     settings,
-		CompendiumItems: items,
+		Title:             "Compendium",
+		Notice:            r.URL.Query().Get("notice"),
+		AppSettings:       browse.Settings,
+		Categories:        domain.Categories(),
+		Rarities:          domain.Rarities(),
+		Compendium:        browse,
+		CompendiumFilters: filters,
+		CompendiumView:    view,
 	})
+}
+
+const (
+	compendiumViewTiles = "tiles"
+	compendiumViewList  = "list"
+)
+
+// normalizeCompendiumView resolves the ?view= parameter, defaulting to tiles.
+func normalizeCompendiumView(value string) string {
+	if strings.ToLower(strings.TrimSpace(value)) == compendiumViewList {
+		return compendiumViewList
+	}
+	return compendiumViewTiles
+}
+
+// parseCompendiumFilters maps the compendium browse query string onto the raw
+// filter values the application layer parses and the template repopulates.
+func parseCompendiumFilters(r *http.Request) application.CompendiumFilters {
+	query := r.URL.Query()
+	return application.CompendiumFilters{
+		Query:                  query.Get("q"),
+		Category:               query.Get("category"),
+		Rarity:                 query.Get("rarity"),
+		MinWeightLB:            query.Get("min_weight_lb"),
+		MaxWeightLB:            query.Get("max_weight_lb"),
+		MinValueGP:             query.Get("min_value_gp"),
+		MaxValueGP:             query.Get("max_value_gp"),
+		Magical:                query.Get("magical"),
+		Attunement:             query.Get("attunement"),
+		SortBy:                 query.Get("sort"),
+		ArmorCategory:          query.Get("armor_category"),
+		ArmorDexBehavior:       query.Get("armor_dex_behavior"),
+		ArmorMinAC:             query.Get("armor_min_ac"),
+		ArmorMaxAC:             query.Get("armor_max_ac"),
+		ArmorStealth:           query.Get("armor_stealth"),
+		WeaponCategory:         query.Get("weapon_category"),
+		WeaponDamageType:       query.Get("weapon_damage_type"),
+		WeaponProperty:         query.Get("weapon_property"),
+		ContainerMinCapacityLB: query.Get("container_min_capacity_lb"),
+		ContainerMaxCapacityLB: query.Get("container_max_capacity_lb"),
+		ToolCategory:           query.Get("tool_category"),
+		MountType:              query.Get("mount_type"),
+		MountMinSpeed:          query.Get("mount_min_speed"),
+		MountMaxSpeed:          query.Get("mount_max_speed"),
+		VehicleType:            query.Get("vehicle_type"),
+		VehicleMinSpeed:        query.Get("vehicle_min_speed"),
+		VehicleMaxSpeed:        query.Get("vehicle_max_speed"),
+		TreasureKind:           query.Get("treasure_kind"),
+	}
 }
 
 func (s *Server) handleItems(w http.ResponseWriter, r *http.Request) {

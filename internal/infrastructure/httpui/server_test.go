@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"bank-of-vivaldi/internal/application"
 	"bank-of-vivaldi/internal/domain"
 )
 
@@ -483,5 +484,316 @@ func TestItemFormWeaponCategoryMarksSavedSelection(t *testing.T) {
 	html := rendered.String()
 	if !strings.Contains(html, `<option value="martial-ranged" selected>`) {
 		t.Fatalf("expected the saved weapon category to be pre-selected, got:\n%s", html)
+	}
+}
+
+func compendiumTemplateData(view string, filters application.CompendiumFilters) TemplateData {
+	scaleMail := domain.Item{
+		ID:                 "scale",
+		Name:               "Scale Mail",
+		Category:           "armor",
+		Rarity:             domain.RarityRare,
+		Description:        "Interlocking metal rings sewn onto a leather backing.",
+		WeightHundredthsLB: 4500,
+		BaseValueCP:        5000,
+		Quantity:           1,
+	}
+	scaleMail.Details.Armor = &domain.ArmorDetails{ArmorCategory: "medium", BaseAC: 14}
+
+	return TemplateData{
+		Title:             "Compendium",
+		Categories:        domain.Categories(),
+		Rarities:          domain.Rarities(),
+		CompendiumView:    view,
+		CompendiumFilters: filters,
+		Compendium: application.CompendiumBrowse{
+			Entries: []application.CompendiumEntry{{
+				Item:           scaleMail,
+				ContainerPath:  "Oak Chest",
+				IsNested:       true,
+				UnitWeightLB:   "45",
+				UnitValueText:  "50 gp",
+				TotalWeightLB:  "45",
+				TotalValueText: "50 gp",
+			}},
+			Facets:     domain.CompendiumFacets{ArmorCategories: []string{"medium"}},
+			TotalCount: 3,
+			MatchCount: 1,
+		},
+	}
+}
+
+func renderCompendium(t *testing.T, data TemplateData) string {
+	t.Helper()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	var rendered bytes.Buffer
+	if err := server.tmpl.ExecuteTemplate(&rendered, "compendium", data); err != nil {
+		t.Fatalf("render compendium: %v", err)
+	}
+	return rendered.String()
+}
+
+func TestCompendiumRendersTilesByDefault(t *testing.T) {
+	t.Parallel()
+
+	html := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{}))
+
+	if !strings.Contains(html, `class="card-grid"`) {
+		t.Fatalf("expected a card grid in the tile view, got:\n%s", html)
+	}
+	if !strings.Contains(html, `class="item-card`) {
+		t.Fatalf("expected item cards in the tile view, got:\n%s", html)
+	}
+	if strings.Contains(html, "<table") {
+		t.Fatalf("expected no table in the tile view, got:\n%s", html)
+	}
+	for _, fragment := range []string{"Scale Mail", "Armor", "Rare", "45 lb", "50 gp", "Interlocking metal rings"} {
+		if !strings.Contains(html, fragment) {
+			t.Fatalf("expected card to show %q, got:\n%s", fragment, html)
+		}
+	}
+}
+
+func TestCompendiumCardOrdersFieldsPerIssueLayout(t *testing.T) {
+	t.Parallel()
+
+	html := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{}))
+
+	name := strings.Index(html, "Scale Mail")
+	meta := strings.Index(html, `class="item-card__meta"`)
+	stats := strings.Index(html, `class="item-card__stats"`)
+	description := strings.Index(html, "Interlocking metal rings")
+
+	if name < 0 || meta < 0 || stats < 0 || description < 0 {
+		t.Fatalf("expected name, meta, stats and description on the card, got:\n%s", html)
+	}
+	if !(name < meta && meta < stats && stats < description) {
+		t.Fatalf("expected card order name -> category/rarity -> weight/value -> description, got:\n%s", html)
+	}
+}
+
+func TestCompendiumListViewRendersTable(t *testing.T) {
+	t.Parallel()
+
+	html := renderCompendium(t, compendiumTemplateData(compendiumViewList, application.CompendiumFilters{}))
+
+	if !strings.Contains(html, "<table") {
+		t.Fatalf("expected a table in the list view, got:\n%s", html)
+	}
+	if strings.Contains(html, `class="card-grid"`) {
+		t.Fatalf("expected no card grid in the list view, got:\n%s", html)
+	}
+	if !strings.Contains(html, "Container path") {
+		t.Fatalf("expected the list view to show the container path column, got:\n%s", html)
+	}
+}
+
+func TestCompendiumViewToggleSubmitsWithinTheFilterForm(t *testing.T) {
+	t.Parallel()
+
+	html := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{Query: "mail"}))
+
+	if !strings.Contains(html, `name="view" value="list"`) {
+		t.Fatalf("expected a list-view submit button, got:\n%s", html)
+	}
+	if !strings.Contains(html, `name="view" value="tiles"`) {
+		t.Fatalf("expected a tile-view submit button, got:\n%s", html)
+	}
+	// The active filters must ride along with the toggle, so they live in the same form.
+	if !strings.Contains(html, `name="q" value="mail"`) {
+		t.Fatalf("expected active filters to be repopulated in the form, got:\n%s", html)
+	}
+	if strings.Contains(html, `type="hidden" name="view"`) {
+		t.Fatalf("expected no hidden view input; it would win over the toggle buttons, got:\n%s", html)
+	}
+}
+
+func TestCompendiumFilterGroupsFollowSelectedCategory(t *testing.T) {
+	t.Parallel()
+
+	html := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{}))
+	for _, group := range []string{"armor", "weapon", "container", "tool", "mount", "vehicle", "treasure"} {
+		if !strings.Contains(html, `data-filter-group="`+group+`" hidden`) {
+			t.Fatalf("expected the %s filter group to be hidden with no category selected, got:\n%s", group, html)
+		}
+	}
+
+	html = renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{Category: "armor"}))
+	if strings.Contains(html, `data-filter-group="armor" hidden`) {
+		t.Fatalf("expected the armor filter group to be visible for the armor category, got:\n%s", html)
+	}
+	if !strings.Contains(html, `data-filter-group="weapon" hidden`) {
+		t.Fatalf("expected the weapon filter group to stay hidden for the armor category, got:\n%s", html)
+	}
+	if !strings.Contains(html, `name="armor_min_ac"`) || !strings.Contains(html, `name="armor_max_ac"`) {
+		t.Fatalf("expected armor AC range filters, got:\n%s", html)
+	}
+	// The armor category dropdown is built from the values present in the data.
+	if !strings.Contains(html, `<option value="medium"`) {
+		t.Fatalf("expected armor category facet options, got:\n%s", html)
+	}
+}
+
+func TestCompendiumWeaponGroupUsesTheFourWeaponCategories(t *testing.T) {
+	t.Parallel()
+
+	html := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{Category: "weapon"}))
+
+	if !strings.Contains(html, `name="weapon_category"`) {
+		t.Fatalf("expected a weapon category filter, got:\n%s", html)
+	}
+	for _, category := range domain.WeaponCategories() {
+		if !strings.Contains(html, `<option value="`+category+`"`) {
+			t.Fatalf("expected weapon category option %q, got:\n%s", category, html)
+		}
+	}
+}
+
+func TestCompendiumFilterScriptDisablesHiddenGroupInputs(t *testing.T) {
+	t.Parallel()
+
+	html := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{}))
+
+	if !strings.Contains(html, `input.disabled = !visible;`) {
+		t.Fatalf("expected hidden filter group inputs to be disabled so they never reach the query string, got:\n%s", html)
+	}
+	if !strings.Contains(html, `categorySelect.addEventListener`) {
+		t.Fatalf("expected the filter script to react to category changes, got:\n%s", html)
+	}
+
+	// The script anchors itself with document.currentScript.closest("form"), so it
+	// must live inside the filter form or it silently does nothing.
+	formStart := strings.Index(html, "data-compendium-filters")
+	if formStart < 0 {
+		t.Fatalf("expected the compendium filter form, got:\n%s", html)
+	}
+	rest := html[formStart:]
+	scriptStart := strings.Index(rest, `document.currentScript.closest("form")`)
+	formEnd := strings.Index(rest, "</form>")
+	if scriptStart < 0 || formEnd < 0 || scriptStart > formEnd {
+		t.Fatalf("expected the filter script to sit inside the filter form, got:\n%s", html)
+	}
+}
+
+func TestCompendiumShowsMatchCounts(t *testing.T) {
+	t.Parallel()
+
+	html := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{Category: "armor"}))
+
+	if !strings.Contains(html, "1 of 3") {
+		t.Fatalf("expected the matched/total item counts to be shown, got:\n%s", html)
+	}
+}
+
+func TestCompendiumEmptyResultExplainsTheFilter(t *testing.T) {
+	t.Parallel()
+
+	data := compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{Category: "weapon"})
+	data.Compendium.Entries = nil
+	data.Compendium.MatchCount = 0
+
+	html := renderCompendium(t, data)
+	if !strings.Contains(html, "No compendium items match") {
+		t.Fatalf("expected an empty-result message, got:\n%s", html)
+	}
+}
+
+func TestNormalizeCompendiumView(t *testing.T) {
+	t.Parallel()
+
+	if got := normalizeCompendiumView(""); got != compendiumViewTiles {
+		t.Fatalf("default view = %q, want %q", got, compendiumViewTiles)
+	}
+	if got := normalizeCompendiumView("list"); got != compendiumViewList {
+		t.Fatalf("view = %q, want %q", got, compendiumViewList)
+	}
+	if got := normalizeCompendiumView("nonsense"); got != compendiumViewTiles {
+		t.Fatalf("unknown view = %q, want the tiles default", got)
+	}
+}
+
+func TestParseCompendiumFiltersReadsEveryQueryParam(t *testing.T) {
+	t.Parallel()
+
+	query := url.Values{
+		"q":                         {"mail"},
+		"category":                  {"armor"},
+		"rarity":                    {"rare"},
+		"min_weight_lb":             {"1"},
+		"max_weight_lb":             {"50"},
+		"min_value_gp":              {"10"},
+		"max_value_gp":              {"500"},
+		"magical":                   {"yes"},
+		"attunement":                {"no"},
+		"sort":                      {"weight"},
+		"armor_category":            {"medium"},
+		"armor_dex_behavior":        {"max-2"},
+		"armor_min_ac":              {"12"},
+		"armor_max_ac":              {"18"},
+		"armor_stealth":             {"no"},
+		"weapon_category":           {"martial-ranged"},
+		"weapon_damage_type":        {"piercing"},
+		"weapon_property":           {"heavy"},
+		"container_min_capacity_lb": {"5"},
+		"container_max_capacity_lb": {"300"},
+		"tool_category":             {"thieves"},
+		"mount_type":                {"horse"},
+		"mount_min_speed":           {"30"},
+		"mount_max_speed":           {"80"},
+		"vehicle_type":              {"water"},
+		"vehicle_min_speed":         {"5"},
+		"vehicle_max_speed":         {"25"},
+		"treasure_kind":             {"gem"},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/compendium?"+query.Encode(), nil)
+	filters := parseCompendiumFilters(req)
+
+	want := application.CompendiumFilters{
+		Query:                  "mail",
+		Category:               "armor",
+		Rarity:                 "rare",
+		MinWeightLB:            "1",
+		MaxWeightLB:            "50",
+		MinValueGP:             "10",
+		MaxValueGP:             "500",
+		Magical:                "yes",
+		Attunement:             "no",
+		SortBy:                 "weight",
+		ArmorCategory:          "medium",
+		ArmorDexBehavior:       "max-2",
+		ArmorMinAC:             "12",
+		ArmorMaxAC:             "18",
+		ArmorStealth:           "no",
+		WeaponCategory:         "martial-ranged",
+		WeaponDamageType:       "piercing",
+		WeaponProperty:         "heavy",
+		ContainerMinCapacityLB: "5",
+		ContainerMaxCapacityLB: "300",
+		ToolCategory:           "thieves",
+		MountType:              "horse",
+		MountMinSpeed:          "30",
+		MountMaxSpeed:          "80",
+		VehicleType:            "water",
+		VehicleMinSpeed:        "5",
+		VehicleMaxSpeed:        "25",
+		TreasureKind:           "gem",
+	}
+
+	if filters != want {
+		t.Fatalf("filters = %+v, want %+v", filters, want)
+	}
+}
+
+func TestRarityClass(t *testing.T) {
+	t.Parallel()
+
+	if got := rarityClass(domain.RarityVeryRare); got != "rarity-very-rare" {
+		t.Fatalf("rarity class = %q, want %q", got, "rarity-very-rare")
 	}
 }

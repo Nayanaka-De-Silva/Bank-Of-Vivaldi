@@ -310,20 +310,6 @@ func (s *Service) SetDefaultEncumbranceMode(ctx context.Context, mode domain.Enc
 	return nil
 }
 
-func (s *Service) ListCompendium(ctx context.Context) ([]ItemNode, domain.AppSettings, error) {
-	settings, err := s.store.GetAppSettings(ctx)
-	if err != nil {
-		return nil, domain.AppSettings{}, err
-	}
-
-	items, err := s.store.ListItems(ctx)
-	if err != nil {
-		return nil, domain.AppSettings{}, err
-	}
-
-	return buildNodes(filterRootItems(items, domain.LocationKindCompendiumRoot, ""), items), settings, nil
-}
-
 func (s *Service) SaveItem(ctx context.Context, input SaveItemInput) (domain.Item, error) {
 	allItems, err := s.store.ListItems(ctx)
 	if err != nil {
@@ -938,27 +924,27 @@ func buildContainerPath(item domain.Item, allItems []domain.Item) string {
 }
 
 func sortSearchResults(results []SearchResult, sortBy string) {
+	sort.SliceStable(results, func(i, j int) bool {
+		return itemLess(results[i].Item, results[j].Item, sortBy)
+	})
+}
+
+// itemLess is the shared ordering used by every item listing so search and the
+// compendium browser cannot drift apart.
+func itemLess(a, b domain.Item, sortBy string) bool {
 	switch sortBy {
 	case "weight":
-		sort.Slice(results, func(i, j int) bool {
-			return results[i].Item.TotalWeightHundredthsLB() < results[j].Item.TotalWeightHundredthsLB()
-		})
+		return a.TotalWeightHundredthsLB() < b.TotalWeightHundredthsLB()
 	case "value":
-		sort.Slice(results, func(i, j int) bool {
-			return results[i].Item.TotalValueCP() < results[j].Item.TotalValueCP()
-		})
+		return a.TotalValueCP() < b.TotalValueCP()
 	case "category":
-		sort.Slice(results, func(i, j int) bool {
-			return results[i].Item.Category < results[j].Item.Category
-		})
+		return a.Category < b.Category
 	case "rarity":
-		sort.Slice(results, func(i, j int) bool {
-			return string(results[i].Item.Rarity) < string(results[j].Item.Rarity)
-		})
+		return string(a.Rarity) < string(b.Rarity)
+	case "updated":
+		return a.UpdatedAt.After(b.UpdatedAt)
 	default:
-		sort.Slice(results, func(i, j int) bool {
-			return strings.ToLower(results[i].Item.Name) < strings.ToLower(results[j].Item.Name)
-		})
+		return strings.ToLower(a.Name) < strings.ToLower(b.Name)
 	}
 }
 
