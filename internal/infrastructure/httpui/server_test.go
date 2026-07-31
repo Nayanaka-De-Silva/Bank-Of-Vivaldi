@@ -212,6 +212,37 @@ func TestStylesheetStretchesCompendiumCardLink(t *testing.T) {
 	}
 }
 
+func TestStylesheetHoverPreservesRarityAccentBorder(t *testing.T) {
+	t.Parallel()
+
+	stylesheet := readStylesheet(t)
+
+	hover := strings.Index(stylesheet, ".item-card:hover {")
+	if hover < 0 {
+		t.Fatalf("expected an .item-card:hover rule in the stylesheet")
+	}
+	hoverRule := stylesheet[hover:]
+	if end := strings.Index(hoverRule, "}"); end >= 0 {
+		hoverRule = hoverRule[:end]
+	}
+
+	// The border-color shorthand sets all four sides, including border-left,
+	// which would overwrite the rarity accent carried by .item-card's
+	// border-left. Hover must only touch the non-left sides explicitly.
+	if strings.Contains(hoverRule, "border-color:") {
+		t.Fatalf("expected .item-card:hover to avoid the border-color shorthand so it cannot clobber the rarity accent border-left, got:\n%s", hoverRule)
+	}
+	for _, declaration := range []string{
+		"border-top-color: var(--accent);",
+		"border-right-color: var(--accent);",
+		"border-bottom-color: var(--accent);",
+	} {
+		if !strings.Contains(hoverRule, declaration) {
+			t.Fatalf("expected .item-card:hover to set %q, got:\n%s", declaration, hoverRule)
+		}
+	}
+}
+
 func TestParseItemDetailsIgnoresInactiveCategoryMetadata(t *testing.T) {
 	t.Parallel()
 

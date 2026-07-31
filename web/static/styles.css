@@ -303,8 +303,11 @@ td {
   position: relative;
 }
 
+/* Non-left sides only: border-color would also win over border-left's rarity accent. */
 .item-card:hover {
-  border-color: var(--accent);
+  border-top-color: var(--accent);
+  border-right-color: var(--accent);
+  border-bottom-color: var(--accent);
 }
 
 /* The anchor's own outline is a zero-area box, so the card carries the focus ring. */
