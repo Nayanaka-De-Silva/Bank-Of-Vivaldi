@@ -732,26 +732,25 @@ func (s *Service) CommitBulk(ctx context.Context, input BulkCommitInput) error {
 		}
 	}
 
-	for _, row := range rows {
-		// Per-row location overrides batch location when resolved IDs are present.
-		locationKind := input.LocationKind
-		vaultID := input.VaultID
-		containerID := input.ParentContainerItemID
-
-		if row.ResolvedContainerID != "" {
-			locationKind = domain.LocationKindContainer
-			containerID = row.ResolvedContainerID
-			if row.ResolvedVaultID != "" {
-				vaultID = row.ResolvedVaultID
-			}
-		} else if row.ResolvedVaultID != "" {
-			locationKind = domain.LocationKindVaultRoot
-			vaultID = row.ResolvedVaultID
-			containerID = ""
-		} else if row.LocationKind != "" {
-			locationKind = row.LocationKind
+	// Resolve every row's effective location before committing anything. A
+	// row's location=vault/location=container attribute passes preview
+	// syntactically valid (PreviewBulk only checks it against LocationKind's
+	// three known values) but still needs an actual vault/container target,
+	// which depends on the batch defaults chosen at commit time and so can't
+	// be checked until now. Failing fast here — before any SaveItem call —
+	// keeps a bad row from leaving earlier rows in the same batch committed;
+	// CommitBulk has no transaction, so a failure discovered mid-loop would
+	// otherwise partially apply the batch.
+	locations := make([]domain.ItemLocation, len(rows))
+	for i, row := range rows {
+		location, err := resolveBulkRowLocation(row, input)
+		if err != nil {
+			return err
 		}
+		locations[i] = location
+	}
 
+	for i, row := range rows {
 		// Per-row SourceKind overrides batch default; batch defaults to manual.
 		sourceKind := input.SourceKind
 		if sourceKind == "" {
@@ -777,11 +776,7 @@ func (s *Service) CommitBulk(ctx context.Context, input BulkCommitInput) error {
 			IsEquipped:         boolOr(row.IsEquipped, input.IsEquipped),
 			SourceKind:         sourceKind,
 			Details:            row.Details,
-			Location: domain.ItemLocation{
-				Kind:                  locationKind,
-				OwnerVaultID:          vaultID,
-				ParentContainerItemID: containerID,
-			},
+			Location:           locations[i],
 		})
 		if err != nil {
 			return err
@@ -789,6 +784,53 @@ func (s *Service) CommitBulk(ctx context.Context, input BulkCommitInput) error {
 	}
 
 	return nil
+}
+
+// resolveBulkRowLocation computes a row's effective placement, applying the
+// same per-row-overrides-batch-default precedence as the rest of CommitBulk:
+// a resolved container name wins, then a resolved vault name, then an
+// explicit location= attribute, else the batch default. It returns an error
+// naming the offending row when the resolved kind requires a target
+// (vault/container) that isn't actually available.
+func resolveBulkRowLocation(row domain.BulkPreviewRow, input BulkCommitInput) (domain.ItemLocation, error) {
+	locationKind := input.LocationKind
+	vaultID := input.VaultID
+	containerID := input.ParentContainerItemID
+
+	if row.ResolvedContainerID != "" {
+		locationKind = domain.LocationKindContainer
+		containerID = row.ResolvedContainerID
+		if row.ResolvedVaultID != "" {
+			vaultID = row.ResolvedVaultID
+		}
+	} else if row.ResolvedVaultID != "" {
+		locationKind = domain.LocationKindVaultRoot
+		vaultID = row.ResolvedVaultID
+		containerID = ""
+	} else if row.LocationKind != "" {
+		locationKind = row.LocationKind
+	}
+
+	switch locationKind {
+	case domain.LocationKindVaultRoot:
+		if vaultID == "" {
+			return domain.ItemLocation{}, fmt.Errorf("row %d (%q): location=vault requires a vault (set vault= on the row or choose a default vault)", row.LineNumber, row.Name)
+		}
+	case domain.LocationKindContainer:
+		if containerID == "" {
+			return domain.ItemLocation{}, fmt.Errorf("row %d (%q): location=container requires a target container (set parent= on the row or choose a default container)", row.LineNumber, row.Name)
+		}
+	case domain.LocationKindCompendiumRoot:
+		// No target required.
+	default:
+		return domain.ItemLocation{}, fmt.Errorf("row %d (%q): invalid location kind %q", row.LineNumber, row.Name, locationKind)
+	}
+
+	return domain.ItemLocation{
+		Kind:                  locationKind,
+		OwnerVaultID:          vaultID,
+		ParentContainerItemID: containerID,
+	}, nil
 }
 
 // boolOr returns the value pointed to by override if non-nil, otherwise fallback.

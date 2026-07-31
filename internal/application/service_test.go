@@ -610,6 +610,55 @@ func TestCommitBulkWeaponDetailsSurviveRoundTrip(t *testing.T) {
 	}
 }
 
+func TestCommitBulkRejectsUnresolvableRowLocationBeforeCommittingAnything(t *testing.T) {
+	// Row 1 is a normal row with no location override. Row 2 sets
+	// location=vault but names no vault=, and the batch itself has no
+	// default vault selected (LocationKind: compendium, VaultID: ""). This
+	// must fail for row 2 without creating row 1 — CommitBulk isn't
+	// transactional, so the location check has to run as a pre-flight pass
+	// over every row before any SaveItem call, not discover the bad row
+	// mid-loop.
+	store := newFakeStore()
+
+	rows := []domain.BulkPreviewRow{
+		{
+			LineNumber:         1,
+			Name:               "Good Rope",
+			Quantity:           1,
+			Category:           "equipment",
+			Rarity:             domain.RarityMundane,
+			WeightHundredthsLB: 1000,
+			BaseValueCP:        100,
+		},
+		{
+			LineNumber:         2,
+			Name:               "Bad Rope",
+			Quantity:           1,
+			Category:           "equipment",
+			Rarity:             domain.RarityMundane,
+			WeightHundredthsLB: 1000,
+			BaseValueCP:        100,
+			LocationKind:       domain.LocationKindVaultRoot,
+		},
+	}
+	bytes, _ := json.Marshal(rows)
+	encoded := base64.StdEncoding.EncodeToString(bytes)
+
+	svc := NewService(store)
+	err := svc.CommitBulk(context.Background(), BulkCommitInput{
+		EncodedRows:  encoded,
+		LocationKind: domain.LocationKindCompendiumRoot,
+	})
+	if err == nil {
+		t.Fatal("expected error for row with location=vault and no resolvable vault, got nil")
+	}
+
+	items, _ := store.ListItems(context.Background())
+	if len(items) != 0 {
+		t.Fatalf("expected 0 items (nothing committed), got %d: %+v", len(items), items)
+	}
+}
+
 // threeLevelFixture returns a bag → pouch → coins hierarchy rooted at the compendium.
 // bag has MaxWeightHundredthsLB=5000; pouch has 2000; coins weigh 200 each.
 func threeLevelFixture() (bag, pouch, coins domain.Item) {
