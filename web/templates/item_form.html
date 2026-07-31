@@ -145,10 +145,19 @@
       <label>Weapon damage type
         <input type="text" name="weapon_damage_type" value="{{with .Item.Details.Weapon}}{{.DamageType}}{{end}}">
       </label>
-      <label>Weapon properties
-        <input type="text" name="weapon_properties" value="{{with .Item.Details.Weapon}}{{range $index, $value := .Properties}}{{if $index}}, {{end}}{{$value}}{{end}}{{end}}">
-      </label>
     </div>
+    <fieldset class="property-fieldset" data-weapon-properties>
+      <legend>Weapon properties</legend>
+      <div class="property-grid">
+        {{range weaponPropertyChoices .Item.Details.Weapon}}
+          <label class="property-option{{if not .Known}} property-option--legacy{{end}}">
+            <input type="checkbox" name="weapon_properties" value="{{.Key}}"{{if .Selected}} checked{{end}}>
+            <span class="property-option__label">{{.Label}}</span>
+            <span class="property-option__hint">{{if .Description}}{{.Description}}{{else}}Custom value kept from an earlier entry.{{end}}</span>
+          </label>
+        {{end}}
+      </div>
+    </fieldset>
     <div class="grid two" data-weapon-range-fields>
       <label>Weapon normal range
         <input type="number" name="weapon_normal_range" value="{{with .Item.Details.Weapon}}{{.NormalRange}}{{end}}">
@@ -307,7 +316,7 @@
 
   const weaponGroup = form.querySelector('[data-metadata-group="weapon"]');
   const weaponClassSelect = form.querySelector('select[name="weapon_class"]');
-  const propertiesInput = form.querySelector('input[name="weapon_properties"]');
+  const propertyBoxes = Array.from(form.querySelectorAll('input[name="weapon_properties"]'));
   const rangeFields = form.querySelector("[data-weapon-range-fields]");
   if (!weaponGroup || !weaponClassSelect || !rangeFields) return;
 
@@ -319,9 +328,9 @@
 
     // Ranged weapons and thrown weapons are the only ones that use range values.
     const isRanged = weaponClassSelect.value.includes("ranged");
-    const hasThrown = propertiesInput
-      ? propertiesInput.value.split(",").some((p) => p.trim().toLowerCase() === "thrown")
-      : false;
+    const hasThrown = propertyBoxes.some(
+      (box) => box.checked && box.value.trim().toLowerCase() === "thrown",
+    );
     const show = isRanged || hasThrown;
 
     rangeFields.hidden = !show;
@@ -331,9 +340,7 @@
   };
 
   weaponClassSelect.addEventListener("change", syncWeaponRangeFields);
-  if (propertiesInput) {
-    propertiesInput.addEventListener("input", syncWeaponRangeFields);
-  }
+  propertyBoxes.forEach((box) => box.addEventListener("change", syncWeaponRangeFields));
   // Re-run after the category script toggles the weapon group so hidden ranges stay disabled.
   const categorySelect = form.querySelector('select[name="category"]');
   if (categorySelect) {

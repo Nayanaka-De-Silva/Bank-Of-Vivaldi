@@ -215,6 +215,16 @@ td {
   font-size: 1rem;
 }
 
+/* Weapon property checkbox group inside item form. */
+.property-fieldset { border: 1px solid var(--border); border-radius: .6rem; }
+.property-grid { display: grid; gap: .5rem; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.property-option { display: grid; grid-template-columns: auto 1fr; column-gap: .5rem; align-items: start; }
+/* Override the global input { width: 100% } rule so checkboxes are not stretched. */
+.property-option input[type="checkbox"] { width: auto; margin: .2rem 0 0; }
+.property-option__label { font-weight: 600; }
+.property-option__hint { grid-column: 2; font-size: .78rem; color: var(--muted); }
+.property-option--legacy .property-option__label { color: var(--muted); font-style: italic; }
+
 .item-tree {
   list-style: none;
   margin: 0;
@@ -383,6 +393,29 @@ td {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+/* Weapon property chips: CSS-only tooltip on hover and keyboard focus. */
+.prop-chips {
+  list-style: none; margin: .15rem 0 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: .3rem;
+  /* Above the stretched card link, or chips would never receive hover. */
+  position: relative; z-index: 1;
+}
+.prop-chip { position: relative; }
+.prop-chip__label { cursor: help; background: var(--panel); }
+.prop-chip--unknown .prop-chip__label { color: var(--muted); border-style: dashed; cursor: default; }
+.prop-chip__tip {
+  position: absolute; bottom: calc(100% + .35rem); left: 0; z-index: 5;
+  width: max-content; max-width: 16rem; padding: .45rem .6rem;
+  background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: .45rem;
+  font-size: .78rem; line-height: 1.35;
+  text-transform: none; letter-spacing: normal;
+  opacity: 0; pointer-events: none; transition: opacity .12s ease-in-out;
+}
+.prop-chip:hover .prop-chip__tip,
+.prop-chip:focus-within .prop-chip__tip { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .prop-chip__tip { transition: none; } }
 
 /* Rarity accents, shared by cards and list-view badges. */
 .rarity-mundane { --rarity: #8fa2b4; }

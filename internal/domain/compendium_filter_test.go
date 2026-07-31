@@ -274,6 +274,24 @@ func TestCompendiumCriteriaRemainingMetadataGroups(t *testing.T) {
 	}
 }
 
+func TestWeaponCriteriaMatchesTwoHandedStoredWithSpaceFormat(t *testing.T) {
+	t.Parallel()
+
+	// Legacy items may have "Two Handed" stored instead of the canonical "two-handed"
+	// slug. EqualWeaponProperty must bridge that gap so the filter still matches.
+	item := Item{Name: "Greatsword", Category: "weapon"}
+	item.Details.Weapon = &WeaponDetails{
+		WeaponClass: "martial-melee",
+		Properties:  []string{"Two Handed"},
+	}
+
+	criteria := CompendiumCriteria{Category: "weapon"}
+	criteria.Weapon = WeaponCriteria{Property: "two-handed"}
+	if !criteria.Matches(item) {
+		t.Fatalf("expected item with property %q to match filter %q via EqualWeaponProperty", "Two Handed", "two-handed")
+	}
+}
+
 func TestBuildCompendiumFacetsDedupesAndSorts(t *testing.T) {
 	t.Parallel()
 

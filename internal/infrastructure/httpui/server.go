@@ -76,6 +76,36 @@ func containerMetadataVisible(category string, isContainer bool) bool {
 	return isContainer || itemMetadataVisible(category, "container")
 }
 
+// weaponPropertyChip is one rendered pill plus the id its tooltip is wired to
+// through aria-describedby.
+type weaponPropertyChip struct{ Label, Description, DescriptionID string }
+
+// weaponPropertyChips resolves stored property values for display, scoping
+// tooltip ids to `scope` (pass the item ID) so multiple cards on one page don't
+// collide. Returns nil for nil details or no properties so callers can guard
+// with {{with}}.
+func weaponPropertyChips(scope any, details *domain.WeaponDetails) []weaponPropertyChip {
+	if details == nil || len(details.Properties) == 0 {
+		return nil
+	}
+	scopeStr := domain.Slugify(fmt.Sprint(scope))
+	props := domain.ResolveWeaponProperties(details.Properties)
+	chips := make([]weaponPropertyChip, 0, len(props))
+	for _, prop := range props {
+		chip := weaponPropertyChip{
+			Label:       prop.Label,
+			Description: prop.Description,
+		}
+		// DescriptionID is only set for described (canonical) properties;
+		// an empty id is the signal the partial uses to omit the tooltip element.
+		if prop.Description != "" {
+			chip.DescriptionID = "wp-" + scopeStr + "-" + prop.Key
+		}
+		chips = append(chips, chip)
+	}
+	return chips
+}
+
 func NewServer(service *application.Service) (*Server, error) {
 	funcs := template.FuncMap{
 		"eq":                       func(a, b any) bool { return fmt.Sprint(a) == fmt.Sprint(b) },
@@ -91,6 +121,17 @@ func NewServer(service *application.Service) (*Server, error) {
 		"contains": func(haystack, needle string) bool {
 			return strings.Contains(strings.ToLower(haystack), strings.ToLower(needle))
 		},
+		// Nil-safe: returns all ten canonical choices with selection set from the stored properties.
+		"weaponPropertyChoices": func(d *domain.WeaponDetails) []domain.WeaponPropertyChoice {
+			if d == nil {
+				return domain.WeaponPropertyChoices(nil)
+			}
+			return domain.WeaponPropertyChoices(d.Properties)
+		},
+		// Returns the ten canonical property keys plus any non-canonical values in stored.
+		"weaponPropertyOptions": domain.WeaponPropertyOptions,
+		// Resolves stored properties for chip display; returns nil when there are no properties.
+		"weaponPropertyChips": weaponPropertyChips,
 	}
 
 	tmpl, err := template.New("pages").Funcs(funcs).ParseFS(webassets.FS, "templates/*.html")
@@ -807,6 +848,12 @@ func parseItemInput(r *http.Request, existingID string) (application.SaveItemInp
 }
 
 func parseItemDetails(r *http.Request, category string, isContainer bool) (domain.ItemDetails, error) {
+	// Ensure r.Form is populated before any r.Form[] slice reads (r.FormValue already
+	// calls this internally, but being explicit prevents subtle ordering bugs).
+	if err := r.ParseForm(); err != nil {
+		return domain.ItemDetails{}, err
+	}
+
 	var details domain.ItemDetails
 	activeCategory := strings.ToLower(strings.TrimSpace(category))
 
@@ -855,14 +902,14 @@ func parseItemDetails(r *http.Request, category string, isContainer bool) (domai
 		if err != nil {
 			return domain.ItemDetails{}, err
 		}
-		properties := []string{}
-		for _, property := range strings.Split(r.FormValue("weapon_properties"), ",") {
-			property = strings.TrimSpace(property)
-			if property != "" {
-				properties = append(properties, property)
-			}
-		}
-		if weaponClass != "" {
+		// Checkboxes submit repeated values; NormalizeWeaponProperties canonicalizes and dedupes.
+		// Unknown/legacy property values are kept as-is (unlike weapon_class, which we reject
+		// when invalid) because legacy free-text properties re-submit via pre-checked form entries
+		// and must survive a save without being silently dropped.
+		properties := domain.NormalizeWeaponProperties(r.Form["weapon_properties"])
+		// Set Weapon when either the class or at least one property is present, so
+		// properties are not lost when the user leaves the category dropdown empty.
+		if weaponClass != "" || len(properties) > 0 {
 			details.Weapon = &domain.WeaponDetails{
 				WeaponClass: weaponClass,
 				DamageDice:  r.FormValue("weapon_damage_dice"),

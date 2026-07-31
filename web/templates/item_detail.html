@@ -9,6 +9,10 @@
     <p><strong>Total weight:</strong> {{weight .ItemDetail.Item.TotalWeightHundredthsLB}} lb</p>
     <p><strong>Total value:</strong> {{gp .ItemDetail.Item.TotalValueCP}}</p>
     <p>{{.ItemDetail.Item.Description}}</p>
+    {{with $chips := weaponPropertyChips .ItemDetail.Item.ID .ItemDetail.Item.Details.Weapon}}
+      <p><strong>Weapon properties:</strong></p>
+      {{template "weapon_property_chips" $chips}}
+    {{end}}
 
     {{if .ItemDetail.Children}}
       <h2>Container contents</h2>
