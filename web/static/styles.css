@@ -227,3 +227,145 @@ td {
   gap: 0.75rem;
   padding: 0.3rem 0;
 }
+
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: start;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.panel-head h1 {
+  margin: 0 0 0.35rem;
+}
+
+.panel-head p {
+  margin: 0;
+}
+
+.head-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+
+.reset-link {
+  color: var(--muted);
+}
+
+.view-toggle {
+  display: flex;
+  margin-left: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  overflow: hidden;
+}
+
+.view-toggle button {
+  border-radius: 0;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-weight: 600;
+  padding: 0.55rem 1rem;
+}
+
+.view-toggle button.active {
+  background: var(--accent);
+  color: #051016;
+}
+
+/* Tile view: one card per compendium item. */
+.card-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.item-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  /* The rarity tier is carried by the left edge accent. */
+  border-left: 4px solid var(--rarity, var(--border));
+  border-radius: 0.6rem;
+}
+
+.item-card__title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.item-card__meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.item-card__meta .rarity-label {
+  color: var(--rarity, var(--text));
+  font-weight: 600;
+}
+
+.item-card__stats {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.item-card__desc {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.item-card__path {
+  margin: auto 0 0;
+  padding-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.dot {
+  color: var(--muted);
+}
+
+.tag {
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Rarity accents, shared by cards and list-view badges. */
+.rarity-mundane { --rarity: #8fa2b4; }
+.rarity-unknown { --rarity: #6b7c8d; }
+.rarity-common { --rarity: #c7d3de; }
+.rarity-uncommon { --rarity: #63e6be; }
+.rarity-rare { --rarity: #70a8ff; }
+.rarity-very-rare { --rarity: #c084fc; }
+.rarity-legendary { --rarity: #ffb84d; }
+.rarity-artifact { --rarity: #ff6b6b; }
+
+td .rarity-label {
+  color: var(--rarity, var(--text));
+  font-weight: 600;
+}
