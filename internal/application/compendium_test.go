@@ -266,3 +266,50 @@ func TestCompendiumFiltersActiveCategoryHelpers(t *testing.T) {
 		t.Fatalf("expected no group to be shown when no category is selected")
 	}
 }
+
+func TestBrowseCompendiumSortsOnTheValuesItDisplays(t *testing.T) {
+	t.Parallel()
+
+	store := newFakeStore()
+	// A cheap, light stack whose totals outrank its per-item figures: the compendium
+	// shows and filters on unit weight/value, so it must sort on them too.
+	store.items["gems"] = domain.Item{
+		ID:                 "gems",
+		Name:               "Amber Gems",
+		Category:           "treasure",
+		Rarity:             domain.RarityUncommon,
+		WeightHundredthsLB: 100,
+		BaseValueCP:        10000,
+		Quantity:           100,
+		Location:           domain.ItemLocation{Kind: domain.LocationKindCompendiumRoot},
+	}
+	store.items["plate"] = domain.Item{
+		ID:                 "plate",
+		Name:               "Plate Armor",
+		Category:           "armor",
+		Rarity:             domain.RarityMundane,
+		WeightHundredthsLB: 6500,
+		BaseValueCP:        150000,
+		Quantity:           1,
+		Location:           domain.ItemLocation{Kind: domain.LocationKindCompendiumRoot},
+	}
+	service := NewService(store)
+
+	browse, err := service.BrowseCompendium(context.Background(), CompendiumFilters{SortBy: "value"})
+	if err != nil {
+		t.Fatalf("browse compendium: %v", err)
+	}
+	// Unit values: gems 100 gp, plate 1500 gp. Stack totals would flip this order.
+	if got := entryNames(browse.Entries); got[0] != "Amber Gems" {
+		t.Fatalf("value sort = %v, want the cheaper per-item entry first", got)
+	}
+
+	browse, err = service.BrowseCompendium(context.Background(), CompendiumFilters{SortBy: "weight"})
+	if err != nil {
+		t.Fatalf("browse compendium: %v", err)
+	}
+	// Unit weights: gems 1 lb, plate 65 lb. Stack totals would flip this order.
+	if got := entryNames(browse.Entries); got[0] != "Amber Gems" {
+		t.Fatalf("weight sort = %v, want the lighter per-item entry first", got)
+	}
+}

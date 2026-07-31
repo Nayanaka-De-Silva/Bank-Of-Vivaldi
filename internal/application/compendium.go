@@ -195,7 +195,7 @@ func (s *Service) BrowseCompendium(ctx context.Context, filters CompendiumFilter
 	}
 
 	sort.SliceStable(entries, func(i, j int) bool {
-		return itemLess(entries[i].Item, entries[j].Item, filters.SortBy)
+		return compendiumEntryLess(entries[i].Item, entries[j].Item, filters.SortBy)
 	})
 
 	return CompendiumBrowse{
@@ -207,6 +207,22 @@ func (s *Service) BrowseCompendium(ctx context.Context, filters CompendiumFilter
 		TotalCount: len(scoped),
 		MatchCount: len(entries),
 	}, nil
+}
+
+// compendiumEntryLess orders compendium entries. Weight and value sort on the same
+// per-unit figures the card and the weight/value filters use (item.WeightHundredthsLB,
+// item.BaseValueCP) rather than stack totals, so a stack's position in the list never
+// contradicts the numbers shown on its own card. Every other key defers to the
+// shared itemLess ordering used by /search.
+func compendiumEntryLess(a, b domain.Item, sortBy string) bool {
+	switch sortBy {
+	case "weight":
+		return a.WeightHundredthsLB < b.WeightHundredthsLB
+	case "value":
+		return a.BaseValueCP < b.BaseValueCP
+	default:
+		return itemLess(a, b, sortBy)
+	}
 }
 
 // compendiumScopedItems returns every item held by the compendium: root items plus
