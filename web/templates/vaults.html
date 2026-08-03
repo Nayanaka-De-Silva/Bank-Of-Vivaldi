@@ -1,46 +1,40 @@
 {{define "vaults"}}
 {{template "page_top" .}}
-<section class="grid two">
-  <article class="panel">
-    <h1>Vaults</h1>
-    {{if .Vaults}}
-      <table>
-        <thead>
-          <tr>
-            <th>Character</th>
-            <th>Carry</th>
-            <th>Mode</th>
-            <th>State</th>
-            <th>Archived</th>
-          </tr>
-        </thead>
-        <tbody>
-        {{range .Vaults}}
-          <tr>
-            <td><a href="/vaults/{{.Vault.ID}}">{{.Vault.CharacterName}}</a></td>
-            <td>{{weight .TotalCarryWeightHundredths}} / {{weight .MaxCarryWeightHundredths}} lb</td>
-            <td>{{humanize .Vault.EncumbranceMode}}</td>
-            <td>{{humanize .EncumbranceState}}</td>
-            <td>{{if .Vault.Archived}}yes{{else}}no{{end}}</td>
-          </tr>
-        {{end}}
-        </tbody>
-      </table>
-    {{else}}
-      <p>No vaults have been created yet.</p>
-    {{end}}
-  </article>
+<section class="mb-5 rounded-xl border border-edge bg-panel p-5">
+  <div class="mb-4 flex flex-wrap items-start justify-between gap-4">
+    <h1 class="m-0">Vaults</h1>
+    <details class="text-sm" {{if .Error}}open{{end}}>
+      <summary class="cursor-pointer">Create vault</summary>
+      <form method="post" action="/vaults" class="mt-3 flex flex-col gap-3.5">
+        <label>Character name <input type="text" name="character_name" required></label>
+        <label>Strength score <input type="number" name="strength_score" min="1" value="10" required></label>
+        <label>Carry modifier (lb) <input type="number" name="carry_modifier_lb" value="0"></label>
+        <label>Notes <textarea name="notes" rows="4"></textarea></label>
+        <button type="submit">Create vault</button>
+      </form>
+    </details>
+  </div>
 
-  <article class="panel">
-    <h2>Create vault</h2>
-    <form method="post" action="/vaults" class="stack">
-      <label>Character name <input type="text" name="character_name" required></label>
-      <label>Strength score <input type="number" name="strength_score" min="1" value="10" required></label>
-      <label>Carry modifier (lb) <input type="number" name="carry_modifier_lb" value="0"></label>
-      <label>Notes <textarea name="notes" rows="4"></textarea></label>
-      <button type="submit">Create vault</button>
-    </form>
-  </article>
+  {{if .Vaults}}
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
+      {{range .Vaults}}
+        <article class="relative flex flex-col gap-1.5 rounded-lg border border-edge bg-panel-2 p-4{{if .Vault.Archived}} opacity-60{{end}}">
+          <h3 class="m-0 text-[1.05rem]"><a href="/vaults/{{.Vault.ID}}" class="after:absolute after:inset-0 after:rounded-[inherit] after:content-['']">{{.Vault.CharacterName}}</a></h3>
+          <p class="m-0 flex flex-wrap gap-1.5 text-sm">
+            <span>{{humanize .Vault.EncumbranceMode}}</span>
+            <span class="text-muted">&middot;</span>
+            <span>{{humanize .EncumbranceState}}</span>
+          </p>
+          <p class="m-0 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+            <span>{{weight .TotalCarryWeightHundredths}} / {{weight .MaxCarryWeightHundredths}} lb</span>
+            {{if .Vault.Archived}}<span class="rounded-full border border-edge px-1.5 py-0.5 text-[0.72rem] uppercase tracking-wide">Archived</span>{{end}}
+          </p>
+        </article>
+      {{end}}
+    </div>
+  {{else}}
+    <p class="text-muted">No vaults have been created yet.</p>
+  {{end}}
 </section>
 {{template "page_bottom" .}}
 {{end}}

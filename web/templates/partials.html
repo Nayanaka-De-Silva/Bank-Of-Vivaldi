@@ -1,3 +1,14 @@
+{{/* Every checkbox in the app renders through this partial: "Field name: []"
+     inline, box not stretched (issue #18, comment #345). See checkboxField's
+     doc comment in server.go for the fields. */}}
+{{define "checkbox_field"}}
+<label class="inline-flex flex-row items-center gap-2 text-sm{{if .Legacy}} italic text-muted{{end}}"{{if .Legacy}} data-legacy{{end}}>
+  <span class="font-medium">{{.Label}}:</span>
+  <input type="checkbox" name="{{.Name}}"{{if .Value}} value="{{.Value}}"{{end}}{{if .Checked}} checked{{end}} class="h-4 w-4 shrink-0 rounded border border-edge bg-bg accent-accent">
+  {{if .Hint}}<span class="text-xs text-muted">{{.Hint}}</span>{{end}}
+</label>
+{{end}}
+
 {{define "page_top"}}
 <!doctype html>
 <html lang="en">
@@ -5,33 +16,34 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.Title}} - Bank of Vivaldi</title>
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <a href="/">Bank of Vivaldi</a>
-      <span class="subtitle">DM inventory manager</span>
+  <header class="flex flex-wrap items-center justify-between gap-4 border-b border-edge bg-[#0c1015] px-6 py-4">
+    <div class="flex items-baseline gap-3">
+      <a href="/" class="text-lg font-bold">Bank of Vivaldi</a>
+      <span class="text-muted">DM inventory manager</span>
     </div>
-    <nav class="nav">
+    <nav class="flex flex-wrap gap-4">
       <a href="/vaults">Vaults</a>
       <a href="/compendium">Compendium</a>
       <a href="/items/new">New Item</a>
       <a href="/bulk">Bulk Entry</a>
       <a href="/search">Search</a>
     </nav>
-    <form method="post" action="/settings/encumbrance" class="inline-form">
-      <label for="mode">Ruleset</label>
-      <select id="mode" name="mode">
-        <option value="standard" {{if eq .AppSettings.DefaultEncumbranceMode "standard"}}selected{{end}}>Standard</option>
-        <option value="optional" {{if eq .AppSettings.DefaultEncumbranceMode "optional"}}selected{{end}}>Optional Encumbrance</option>
-      </select>
+    <form method="post" action="/settings/encumbrance" class="flex flex-wrap items-end gap-3">
+      <label for="mode" class="flex flex-col gap-1 text-sm">Ruleset
+        <select id="mode" name="mode">
+          <option value="standard" {{if eq .AppSettings.DefaultEncumbranceMode "standard"}}selected{{end}}>Standard</option>
+          <option value="optional" {{if eq .AppSettings.DefaultEncumbranceMode "optional"}}selected{{end}}>Optional Encumbrance</option>
+        </select>
+      </label>
       <button type="submit">Apply</button>
     </form>
   </header>
-  <main class="container">
-    {{if .Notice}}<p class="notice">{{.Notice}}</p>{{end}}
-    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+  <main class="mx-auto max-w-[1280px] px-6 py-6">
+    {{if .Notice}}<p class="mb-4 rounded-lg border border-success/40 bg-success/[0.14] px-4 py-3.5">{{.Notice}}</p>{{end}}
+    {{if .Error}}<p class="mb-4 rounded-lg border border-danger/40 bg-danger/[0.14] px-4 py-3.5 text-[#ffd7d7]">{{.Error}}</p>{{end}}
 {{end}}
 
 {{define "page_bottom"}}
@@ -41,18 +53,20 @@
 {{end}}
 
 {{define "weapon_property_chips"}}
-<ul class="prop-chips">
+{{/* Positioned above the compendium card's stretched title link, or a chip
+     could never receive hover. */}}
+<ul class="prop-chips relative z-[1] m-0 mt-1 flex flex-wrap gap-1.5 p-0 list-none">
   {{range .}}
     <li class="prop-chip{{if not .Description}} prop-chip--unknown{{end}}">
-      <span class="tag prop-chip__label"{{if .Description}} tabindex="0" title="{{.Description}}" aria-describedby="{{.DescriptionID}}"{{end}}>{{.Label}}</span>
-      {{if .Description}}<span class="prop-chip__tip" role="tooltip" id="{{.DescriptionID}}">{{.Description}}</span>{{end}}
+      <span class="prop-chip__label rounded-full border border-edge px-1.5 py-0.5 text-[0.72rem] uppercase tracking-wide{{if .Description}} cursor-help bg-panel{{else}} cursor-default border-dashed text-muted{{end}}"{{if .Description}} tabindex="0" title="{{.Description}}" aria-describedby="{{.DescriptionID}}"{{end}}>{{.Label}}</span>
+      {{if .Description}}<span class="prop-chip__tip rounded-lg border border-edge bg-panel-2 px-2.5 py-1.5 text-[0.78rem] normal-case tracking-normal leading-snug text-ink" role="tooltip" id="{{.DescriptionID}}">{{.Description}}</span>{{end}}
     </li>
   {{end}}
 </ul>
 {{end}}
 
 {{define "location_fields"}}
-<div class="grid three">
+<div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
   <label>Location kind
     <select name="location_kind">
       <option value="compendium" {{if eq .SelectedLocationKind "compendium"}}selected{{end}}>Compendium root</option>
@@ -125,12 +139,12 @@
 {{end}}
 
 {{define "item_nodes"}}
-<ul class="item-tree">
+<ul class="item-tree m-0 list-none pl-4">
   {{range .}}
     <li>
-      <div class="item-row">
+      <div class="item-row flex flex-wrap gap-3 py-1">
         <a href="/items/{{.Item.ID}}">{{.Item.Name}}</a>
-        <span class="muted">{{humanize .Item.Category}}</span>
+        <span class="text-muted">{{humanize .Item.Category}}</span>
         <span>{{.Item.Quantity}}x</span>
         <span>{{weight .TotalWeightHundredths}} lb</span>
         <span>{{gp .TotalValueCP}}</span>

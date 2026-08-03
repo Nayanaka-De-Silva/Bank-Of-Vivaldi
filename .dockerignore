@@ -4,3 +4,5 @@
 node_modules
 tmp
 coverage.out
+# Fetched tailwindcss CLI binary; keep it out of the build context.
+bin/

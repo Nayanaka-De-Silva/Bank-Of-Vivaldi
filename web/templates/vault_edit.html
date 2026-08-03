@@ -1,0 +1,36 @@
+{{define "vault_edit"}}
+{{template "page_top" .}}
+<p><a href="/vaults/{{.VaultDetail.Summary.Vault.ID}}">&larr; Back to {{.VaultDetail.Summary.Vault.CharacterName}}</a></p>
+<section class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
+  <article class="mb-5 rounded-xl border border-edge bg-panel p-5">
+    <h2>Edit vault</h2>
+    <form method="post" action="/vaults/{{.VaultDetail.Summary.Vault.ID}}" class="flex flex-col gap-3.5">
+      <label>Character name <input type="text" name="character_name" value="{{.VaultDetail.Summary.Vault.CharacterName}}" required></label>
+      <label>Strength score <input type="number" name="strength_score" min="1" value="{{.VaultDetail.Summary.Vault.StrengthScore}}" required></label>
+      <label>Carry modifier (lb) <input type="number" name="carry_modifier_lb" value="{{.VaultDetail.Summary.Vault.CarryModifierLB}}"></label>
+      <label>Encumbrance mode
+        <select name="encumbrance_mode">
+          <option value="standard" {{if eq .VaultDetail.Summary.Vault.EncumbranceMode "standard"}}selected{{end}}>Standard</option>
+          <option value="optional" {{if eq .VaultDetail.Summary.Vault.EncumbranceMode "optional"}}selected{{end}}>Optional</option>
+        </select>
+      </label>
+      <label>Notes <textarea name="notes" rows="4">{{.VaultDetail.Summary.Vault.Notes}}</textarea></label>
+      {{template "checkbox_field" (checkbox "Archived" "archived" .VaultDetail.Summary.Vault.Archived)}}
+      <button type="submit">Save vault</button>
+    </form>
+  </article>
+
+  <article class="mb-5 rounded-xl border border-edge bg-panel p-5">
+    <h2>Purse</h2>
+    <form method="post" action="/vaults/{{.VaultDetail.Summary.Vault.ID}}/purse" class="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-4">
+      <label>cp <input type="number" name="cp" value="{{.VaultDetail.Summary.Vault.Purse.CP}}"></label>
+      <label>sp <input type="number" name="sp" value="{{.VaultDetail.Summary.Vault.Purse.SP}}"></label>
+      <label>ep <input type="number" name="ep" value="{{.VaultDetail.Summary.Vault.Purse.EP}}"></label>
+      <label>gp <input type="number" name="gp" value="{{.VaultDetail.Summary.Vault.Purse.GP}}"></label>
+      <label>pp <input type="number" name="pp" value="{{.VaultDetail.Summary.Vault.Purse.PP}}"></label>
+      <div class="col-span-full"><button type="submit">Update purse</button></div>
+    </form>
+  </article>
+</section>
+{{template "page_bottom" .}}
+{{end}}

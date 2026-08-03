@@ -129,31 +129,10 @@ func TestItemFormFieldsKeepContainerMetadataVisibleForContainerItems(t *testing.
 	}
 }
 
-func TestStylesheetPreservesHiddenAttribute(t *testing.T) {
-	t.Parallel()
-
-	_, currentFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatalf("resolve current file path")
-	}
-
-	stylesheetPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "web", "static", "styles.css")
-	css, err := os.ReadFile(stylesheetPath)
-	if err != nil {
-		t.Fatalf("read stylesheet: %v", err)
-	}
-
-	stylesheet := string(css)
-	if !strings.Contains(stylesheet, "[hidden] {") {
-		t.Fatalf("expected stylesheet to define a hidden attribute rule")
-	}
-	if !strings.Contains(stylesheet, "display: none !important;") {
-		t.Fatalf("expected hidden attribute rule to force display none")
-	}
-}
-
-// readStylesheet loads web/static/styles.css relative to this test file.
-func readStylesheet(t *testing.T) string {
+// readTailwindInput loads web/tailwind/input.css relative to this test file.
+// This is the hand-authored source of truth: stable, developer-written CSS
+// that survives a Tailwind regeneration, unlike the generated output below.
+func readTailwindInput(t *testing.T) string {
 	t.Helper()
 
 	_, currentFile, _, ok := runtime.Caller(0)
@@ -161,84 +140,118 @@ func readStylesheet(t *testing.T) string {
 		t.Fatalf("resolve current file path")
 	}
 
-	stylesheetPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "web", "static", "styles.css")
-	css, err := os.ReadFile(stylesheetPath)
+	inputPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "web", "tailwind", "input.css")
+	css, err := os.ReadFile(inputPath)
 	if err != nil {
-		t.Fatalf("read stylesheet: %v", err)
+		t.Fatalf("read tailwind input: %v", err)
 	}
 	return string(css)
 }
 
-func TestStylesheetClampsCompendiumCardDescription(t *testing.T) {
+// readGeneratedStylesheet loads the committed, generated web/static/app.css
+// relative to this test file.
+func readGeneratedStylesheet(t *testing.T) string {
+	t.Helper()
+
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatalf("resolve current file path")
+	}
+
+	stylesheetPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "web", "static", "app.css")
+	css, err := os.ReadFile(stylesheetPath)
+	if err != nil {
+		t.Fatalf("read generated stylesheet: %v", err)
+	}
+	return string(css)
+}
+
+func TestTailwindInputPreservesHiddenAttribute(t *testing.T) {
 	t.Parallel()
 
-	stylesheet := readStylesheet(t)
-	for _, declaration := range []string{
-		".item-card__desc {",
-		"-webkit-line-clamp: 3;",
-		"-webkit-box-orient: vertical;",
-		"overflow: hidden;",
+	input := readTailwindInput(t)
+	if !strings.Contains(input, "[hidden] {") {
+		t.Fatalf("expected the tailwind input to define a hidden attribute rule")
+	}
+	if !strings.Contains(input, "display: none !important;") {
+		t.Fatalf("expected the hidden attribute rule to force display none")
+	}
+}
+
+func TestTailwindInputKeepsRarityAccentVariables(t *testing.T) {
+	t.Parallel()
+
+	input := readTailwindInput(t)
+	// Every canonical rarity must set --rarity, or a new rarity added to the
+	// domain vocabulary would silently render with no accent colour.
+	for _, rarity := range domain.Rarities() {
+		class := "." + rarityClass(rarity) + " {"
+		if !strings.Contains(input, class) {
+			t.Fatalf("expected the tailwind input to define %q for rarity %q", class, rarity)
+		}
+	}
+	if !strings.Contains(input, ".rarity-accent {") || !strings.Contains(input, "var(--rarity") {
+		t.Fatalf("expected .rarity-accent to read the --rarity custom property, got:\n%s", input)
+	}
+}
+
+func TestTailwindInputKeepsPropChipTooltip(t *testing.T) {
+	t.Parallel()
+
+	input := readTailwindInput(t)
+	for _, fragment := range []string{
+		".prop-chip {",
+		".prop-chip__tip {",
+		"opacity: 0;",
+		".prop-chip:hover .prop-chip__tip,",
+		".prop-chip:focus-within .prop-chip__tip {",
+		"opacity: 1;",
 	} {
-		if !strings.Contains(stylesheet, declaration) {
-			t.Fatalf("expected card descriptions to be clamped via %q", declaration)
+		if !strings.Contains(input, fragment) {
+			t.Fatalf("expected the tailwind input to contain %q, got:\n%s", fragment, input)
 		}
 	}
 }
 
-func TestStylesheetStretchesCompendiumCardLink(t *testing.T) {
+func TestTailwindInputKeepsNonModalDialogFallback(t *testing.T) {
 	t.Parallel()
 
-	stylesheet := readStylesheet(t)
-	for _, declaration := range []string{
-		".item-card__title a::after {",
-		"position: absolute;",
-		"inset: 0;",
+	input := readTailwindInput(t)
+	for _, fragment := range []string{
+		"dialog:not(:modal) {",
+		"position: static;",
 	} {
-		if !strings.Contains(stylesheet, declaration) {
-			t.Fatalf("expected the card title link to be stretched over the tile via %q", declaration)
+		if !strings.Contains(input, fragment) {
+			t.Fatalf("expected the tailwind input to contain %q, got:\n%s", fragment, input)
 		}
-	}
-
-	card := strings.Index(stylesheet, ".item-card {")
-	if card < 0 {
-		t.Fatalf("expected an .item-card rule in the stylesheet")
-	}
-	cardRule := stylesheet[card:]
-	if end := strings.Index(cardRule, "}"); end >= 0 {
-		cardRule = cardRule[:end]
-	}
-	if !strings.Contains(cardRule, "position: relative;") {
-		t.Fatalf("expected .item-card to establish a positioning context, got:\n%s", cardRule)
 	}
 }
 
-func TestStylesheetHoverPreservesRarityAccentBorder(t *testing.T) {
+func TestTailwindInputScansOnlyTheTemplateDirectory(t *testing.T) {
 	t.Parallel()
 
-	stylesheet := readStylesheet(t)
+	input := readTailwindInput(t)
+	if !strings.Contains(input, `@import "tailwindcss" source(none);`) {
+		t.Fatalf("expected automatic content detection to be disabled, got:\n%s", input)
+	}
+	if !strings.Contains(input, `@source "../templates";`) {
+		t.Fatalf("expected an explicit content source rooted at the templates directory, got:\n%s", input)
+	}
+}
 
-	hover := strings.Index(stylesheet, ".item-card:hover {")
-	if hover < 0 {
-		t.Fatalf("expected an .item-card:hover rule in the stylesheet")
-	}
-	hoverRule := stylesheet[hover:]
-	if end := strings.Index(hoverRule, "}"); end >= 0 {
-		hoverRule = hoverRule[:end]
-	}
+// TestGeneratedStylesheetIsCommitted smoke-tests the build artifact without
+// asserting on Tailwind's own output format: a missing, empty, or
+// layer-stripped `make css` run would silently ship a bare page.
+func TestGeneratedStylesheetIsCommitted(t *testing.T) {
+	t.Parallel()
 
-	// The border-color shorthand sets all four sides, including border-left,
-	// which would overwrite the rarity accent carried by .item-card's
-	// border-left. Hover must only touch the non-left sides explicitly.
-	if strings.Contains(hoverRule, "border-color:") {
-		t.Fatalf("expected .item-card:hover to avoid the border-color shorthand so it cannot clobber the rarity accent border-left, got:\n%s", hoverRule)
+	stylesheet := readGeneratedStylesheet(t)
+	if len(stylesheet) < 10000 {
+		t.Fatalf("expected the generated stylesheet to be substantial, got %d bytes", len(stylesheet))
 	}
-	for _, declaration := range []string{
-		"border-top-color: var(--accent);",
-		"border-right-color: var(--accent);",
-		"border-bottom-color: var(--accent);",
-	} {
-		if !strings.Contains(hoverRule, declaration) {
-			t.Fatalf("expected .item-card:hover to set %q, got:\n%s", declaration, hoverRule)
+	for _, fragment := range []string{"--rarity", ".prop-chip__tip", "[hidden]"} {
+		if !strings.Contains(stylesheet, fragment) {
+			t.Fatalf("expected the generated stylesheet to contain %q", fragment)
 		}
 	}
 }
@@ -815,24 +828,6 @@ func TestItemDialogScriptWiresModalBehaviour(t *testing.T) {
 	}
 }
 
-func TestStylesheetStylesActionDialogs(t *testing.T) {
-	t.Parallel()
-
-	stylesheet := readStylesheet(t)
-	for _, declaration := range []string{
-		"dialog {",
-		"dialog::backdrop {",
-		"dialog:not(:modal) {",
-		"position: static;",
-		".dialog-actions {",
-		"background: var(--panel);",
-	} {
-		if !strings.Contains(stylesheet, declaration) {
-			t.Fatalf("expected stylesheet to style action dialogs via %q", declaration)
-		}
-	}
-}
-
 func TestItemFormWeaponCategoryRendersFourOptions(t *testing.T) {
 	t.Parallel()
 
@@ -911,26 +906,110 @@ func compendiumTemplateData(view string, filters application.CompendiumFilters) 
 	}
 	scaleMail.Details.Armor = &domain.ArmorDetails{ArmorCategory: "medium", BaseAC: 14}
 
+	browse := application.CompendiumBrowse{
+		Entries: []application.CompendiumEntry{{
+			Item:           scaleMail,
+			ContainerPath:  "Oak Chest",
+			IsNested:       true,
+			UnitWeightLB:   "45",
+			UnitValueText:  "50 gp",
+			TotalWeightLB:  "45",
+			TotalValueText: "50 gp",
+		}},
+		Facets:     domain.CompendiumFacets{ArmorCategories: []string{"medium"}},
+		TotalCount: 3,
+		MatchCount: 1,
+	}
+
 	return TemplateData{
 		Title:             "Compendium",
 		Categories:        domain.Categories(),
 		Rarities:          domain.Rarities(),
 		CompendiumView:    view,
 		CompendiumFilters: filters,
-		Compendium: application.CompendiumBrowse{
-			Entries: []application.CompendiumEntry{{
-				Item:           scaleMail,
-				ContainerPath:  "Oak Chest",
-				IsNested:       true,
-				UnitWeightLB:   "45",
-				UnitValueText:  "50 gp",
-				TotalWeightLB:  "45",
-				TotalValueText: "50 gp",
-			}},
-			Facets:     domain.CompendiumFacets{ArmorCategories: []string{"medium"}},
-			TotalCount: 3,
-			MatchCount: 1,
-		},
+		Compendium:        browse,
+		FilterBar:         newFilterBar("/compendium", view, compendiumViews, filters, browse),
+	}
+}
+
+// renderPartial executes a named template directly against an arbitrary dot,
+// bypassing the page wrapper. Used to prove the item_browse.html partials
+// (issue #18) generalize beyond the compendium's own TemplateData shape --
+// the vault browser (added in a later commit) drives them with the same
+// FilterBarData/[]ItemEntry types but different underlying data.
+func renderPartial(t *testing.T, name string, dot any) string {
+	t.Helper()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	var rendered bytes.Buffer
+	if err := server.tmpl.ExecuteTemplate(&rendered, name, dot); err != nil {
+		t.Fatalf("render %s: %v", name, err)
+	}
+	return rendered.String()
+}
+
+func TestItemFilterBarIsSharedByCompendiumAndVault(t *testing.T) {
+	t.Parallel()
+
+	compendiumBar := newFilterBar("/compendium", compendiumViewTiles, compendiumViews, application.CompendiumFilters{Query: "torch"}, application.ItemBrowse{})
+	vaultBar := newFilterBar("/vaults/vault-1", compendiumViewTiles, compendiumViews, application.CompendiumFilters{Query: "torch"}, application.ItemBrowse{})
+
+	compendiumHTML := renderPartial(t, "item_filter_bar", compendiumBar)
+	vaultHTML := renderPartial(t, "item_filter_bar", vaultBar)
+
+	if !strings.Contains(compendiumHTML, `action="/compendium"`) {
+		t.Fatalf("expected the compendium filter bar to submit to /compendium, got:\n%s", compendiumHTML)
+	}
+	if !strings.Contains(vaultHTML, `action="/vaults/vault-1"`) {
+		t.Fatalf("expected the vault filter bar to submit to /vaults/vault-1, got:\n%s", vaultHTML)
+	}
+	// Both must repopulate the same active filter value: it's the same partial,
+	// only the action/reset URLs and the underlying data differ.
+	for _, html := range []string{compendiumHTML, vaultHTML} {
+		if !strings.Contains(html, `name="q" value="torch"`) {
+			t.Fatalf("expected the active query filter to be repopulated, got:\n%s", html)
+		}
+	}
+}
+
+func TestItemCardsPartialRendersTheSameMarkupForBothPages(t *testing.T) {
+	t.Parallel()
+
+	entries := []application.ItemEntry{{
+		Item:          domain.Item{ID: "torch-1", Name: "Torch", Category: "equipment", Rarity: domain.RarityMundane},
+		LocationLabel: "Vault root",
+		UnitWeightLB:  "1",
+		UnitValueText: "1 cp",
+	}}
+
+	html := renderPartial(t, "item_cards", entries)
+
+	if !strings.Contains(html, "data-card-grid") || !strings.Contains(html, "data-item-card") {
+		t.Fatalf("expected the shared card grid markup, got:\n%s", html)
+	}
+	if !strings.Contains(html, ">Torch<") {
+		t.Fatalf("expected the card to show the item name, got:\n%s", html)
+	}
+}
+
+func TestItemTableShowsLocationLabelForRootEntries(t *testing.T) {
+	t.Parallel()
+
+	entries := []application.ItemEntry{{
+		Item:          domain.Item{ID: "torch-1", Name: "Torch", Category: "equipment"},
+		LocationLabel: "Vault root",
+		UnitWeightLB:  "1",
+		UnitValueText: "1 cp",
+	}}
+
+	html := renderPartial(t, "item_table", entries)
+
+	if !strings.Contains(html, "Vault root") {
+		t.Fatalf("expected the table to show the entry's root location label, got:\n%s", html)
 	}
 }
 
@@ -1050,9 +1129,9 @@ func TestItemFormWeaponPropertiesRendersLegacyUnknownProperty(t *testing.T) {
 	if !strings.Contains(html, `value="glowing" checked`) {
 		t.Fatalf("expected legacy glowing checkbox to be pre-checked, got:\n%s", html)
 	}
-	// Its label must carry the legacy CSS modifier class.
-	if !strings.Contains(html, "property-option--legacy") {
-		t.Fatalf("expected property-option--legacy class for legacy property, got:\n%s", html)
+	// Its label must be flagged legacy so it renders visually distinct.
+	if !strings.Contains(html, "data-legacy") {
+		t.Fatalf("expected a data-legacy marker on the legacy property's checkbox field, got:\n%s", html)
 	}
 }
 
@@ -1148,10 +1227,10 @@ func TestCompendiumRendersTilesByDefault(t *testing.T) {
 
 	html := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{}))
 
-	if !strings.Contains(html, `class="card-grid"`) {
+	if !strings.Contains(html, `data-card-grid`) {
 		t.Fatalf("expected a card grid in the tile view, got:\n%s", html)
 	}
-	if !strings.Contains(html, `class="item-card`) {
+	if !strings.Contains(html, `data-item-card`) {
 		t.Fatalf("expected item cards in the tile view, got:\n%s", html)
 	}
 	if strings.Contains(html, "<table") {
@@ -1169,11 +1248,11 @@ func TestCompendiumCardOrdersFieldsPerIssueLayout(t *testing.T) {
 
 	html := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{}))
 
-	name := strings.Index(html, `class="item-card__title"`)
-	meta := strings.Index(html, `class="item-card__meta"`)
-	stats := strings.Index(html, `class="item-card__stats"`)
+	name := strings.Index(html, `data-card-title`)
+	meta := strings.Index(html, `data-card-meta`)
+	stats := strings.Index(html, `data-card-stats`)
 	// Anchored on the element, not the text: the description also appears in the card tooltip.
-	description := strings.Index(html, `class="item-card__desc"`)
+	description := strings.Index(html, `data-card-desc`)
 
 	if name < 0 || meta < 0 || stats < 0 || description < 0 {
 		t.Fatalf("expected name, meta, stats and description on the card, got:\n%s", html)
@@ -1192,7 +1271,7 @@ func TestCompendiumCardExposesFullDescriptionAsTooltip(t *testing.T) {
 	html := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{}))
 
 	tooltip := `title="Interlocking metal rings sewn onto a leather backing."`
-	card := strings.Index(html, `<article class="item-card`)
+	card := strings.Index(html, `<article data-item-card`)
 	if card < 0 {
 		t.Fatalf("expected an item card article, got:\n%s", html)
 	}
@@ -1221,7 +1300,7 @@ func TestCompendiumCardOmitsTooltipWithoutDescription(t *testing.T) {
 	if strings.Contains(html, `title=""`) {
 		t.Fatalf("expected no empty tooltip when the item has no description, got:\n%s", html)
 	}
-	if strings.Contains(html, `class="item-card__desc"`) {
+	if strings.Contains(html, `data-card-desc`) {
 		t.Fatalf("expected no description paragraph when the item has no description, got:\n%s", html)
 	}
 }
@@ -1234,11 +1313,45 @@ func TestCompendiumListViewRendersTable(t *testing.T) {
 	if !strings.Contains(html, "<table") {
 		t.Fatalf("expected a table in the list view, got:\n%s", html)
 	}
-	if strings.Contains(html, `class="card-grid"`) {
+	if strings.Contains(html, `data-card-grid`) {
 		t.Fatalf("expected no card grid in the list view, got:\n%s", html)
 	}
-	if !strings.Contains(html, "Container path") {
-		t.Fatalf("expected the list view to show the container path column, got:\n%s", html)
+	if !strings.Contains(html, "<th>Location</th>") {
+		t.Fatalf("expected the list view to show the location column, got:\n%s", html)
+	}
+	if !strings.Contains(html, "Oak Chest") {
+		t.Fatalf("expected the list view to show the nested item's container path, got:\n%s", html)
+	}
+}
+
+func TestCompendiumCardClampsDescription(t *testing.T) {
+	t.Parallel()
+
+	html := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{}))
+
+	if !strings.Contains(html, "line-clamp-3") {
+		t.Fatalf("expected the card description to be clamped via line-clamp-3, got:\n%s", html)
+	}
+}
+
+func TestCompendiumCardStretchesTitleLink(t *testing.T) {
+	t.Parallel()
+
+	html := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{}))
+
+	card := strings.Index(html, `<article data-item-card`)
+	if card < 0 {
+		t.Fatalf("expected an item card article, got:\n%s", html)
+	}
+	openingTag := html[card:]
+	if end := strings.Index(openingTag, ">"); end >= 0 {
+		openingTag = openingTag[:end]
+	}
+	if !strings.Contains(openingTag, "relative") {
+		t.Fatalf("expected the card to establish a positioning context via `relative`, got:\n%s", openingTag)
+	}
+	if !strings.Contains(html, "after:absolute") || !strings.Contains(html, "after:inset-0") {
+		t.Fatalf("expected the card title link to be stretched over the tile via after:absolute after:inset-0, got:\n%s", html)
 	}
 }
 
@@ -1370,26 +1483,30 @@ func weaponCompendiumTemplateData(view string) TemplateData {
 		Properties:  []string{"thrown", "silvered"}, // one canonical, one legacy
 	}
 
+	browse := application.CompendiumBrowse{
+		Entries: []application.CompendiumEntry{{
+			Item:           longbow,
+			ContainerPath:  "",
+			IsNested:       false,
+			LocationLabel:  "Compendium root",
+			UnitWeightLB:   "2",
+			UnitValueText:  "50 gp",
+			TotalWeightLB:  "2",
+			TotalValueText: "50 gp",
+		}},
+		Facets:     domain.CompendiumFacets{WeaponProperties: []string{"silvered"}},
+		TotalCount: 1,
+		MatchCount: 1,
+	}
+
 	return TemplateData{
 		Title:             "Compendium",
 		Categories:        domain.Categories(),
 		Rarities:          domain.Rarities(),
 		CompendiumView:    view,
 		CompendiumFilters: application.CompendiumFilters{},
-		Compendium: application.CompendiumBrowse{
-			Entries: []application.CompendiumEntry{{
-				Item:           longbow,
-				ContainerPath:  "",
-				IsNested:       false,
-				UnitWeightLB:   "2",
-				UnitValueText:  "50 gp",
-				TotalWeightLB:  "2",
-				TotalValueText: "50 gp",
-			}},
-			Facets:     domain.CompendiumFacets{WeaponProperties: []string{"silvered"}},
-			TotalCount: 1,
-			MatchCount: 1,
-		},
+		Compendium:        browse,
+		FilterBar:         newFilterBar("/compendium", view, compendiumViews, application.CompendiumFilters{}, browse),
 	}
 }
 
@@ -1438,7 +1555,7 @@ func TestWeaponPropertyChipsRenderOnCompendiumCard(t *testing.T) {
 	}
 
 	// The card must still have exactly one item link.
-	card := strings.Index(html, `<article class="item-card`)
+	card := strings.Index(html, `<article data-item-card`)
 	if card < 0 {
 		t.Fatalf("expected an item card article, got:\n%s", html)
 	}
@@ -1487,37 +1604,6 @@ func TestWeaponPropertyChipsRenderOnItemDetail(t *testing.T) {
 	}
 	if !strings.Contains(html, `>Finesse<`) {
 		t.Fatalf("expected Finesse chip on item detail page, got:\n%s", html)
-	}
-}
-
-func TestStylesheetIncludesWeaponPropertyChipAndFormCSS(t *testing.T) {
-	t.Parallel()
-
-	stylesheet := readStylesheet(t)
-
-	for _, fragment := range []string{
-		`.prop-chip__tip {`,
-		`opacity: 0;`,
-		`.prop-chip:focus-within .prop-chip__tip`,
-		`.property-option input[type="checkbox"]`,
-		`width: auto;`,
-	} {
-		if !strings.Contains(stylesheet, fragment) {
-			t.Errorf("expected stylesheet to contain %q", fragment)
-		}
-	}
-
-	// z-index: 1; must appear inside the .prop-chips rule.
-	propChips := strings.Index(stylesheet, ".prop-chips {")
-	if propChips < 0 {
-		t.Fatalf("expected .prop-chips rule in stylesheet")
-	}
-	propChipsRule := stylesheet[propChips:]
-	if end := strings.Index(propChipsRule, "}"); end >= 0 {
-		propChipsRule = propChipsRule[:end]
-	}
-	if !strings.Contains(propChipsRule, "z-index: 1;") {
-		t.Fatalf("expected z-index: 1; inside .prop-chips rule, got:\n%s", propChipsRule)
 	}
 }
 

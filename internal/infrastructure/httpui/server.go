@@ -28,10 +28,13 @@ type TemplateData struct {
 	Dashboard                 application.DashboardData
 	Vaults                    []application.VaultSummary
 	VaultDetail               application.VaultDetail
+	VaultBrowse               application.ItemBrowse
+	VaultView                 string
 	ItemDetail                application.ItemDetail
 	Compendium                application.CompendiumBrowse
 	CompendiumFilters         application.CompendiumFilters
 	CompendiumView            string
+	FilterBar                 FilterBarData
 	SearchResults             []application.SearchResult
 	BulkPreview               domain.BulkPreview
 	BulkText                  string
@@ -78,6 +81,98 @@ func rarityClass(value any) string {
 
 func containerMetadataVisible(category string, isContainer bool) bool {
 	return isContainer || itemMetadataVisible(category, "container")
+}
+
+// FilterBarData is the view model for the item_filter_bar partial shared by
+// the compendium and vault browsers. A Go template has a single dot, and the
+// filter bar needs filters, facets, vocabulary and its own action/reset URLs
+// all at once, so it gets a dedicated struct rather than a funcMap dict hack.
+type FilterBarData struct {
+	Action     string
+	ResetURL   string
+	View       string
+	Views      []string
+	Filters    application.CompendiumFilters
+	Facets     domain.CompendiumFacets
+	Categories []string
+	Rarities   []string
+	MatchCount int
+	TotalCount int
+}
+
+var compendiumViews = []string{compendiumViewTiles, compendiumViewList}
+
+const (
+	vaultViewTiles = "tiles"
+	vaultViewList  = "list"
+	vaultViewTree  = "tree"
+)
+
+var vaultViews = []string{vaultViewTiles, vaultViewList, vaultViewTree}
+
+// normalizeVaultView resolves the ?view= parameter for the vault browser,
+// defaulting to tiles. The vault adds a third "tree" mode (the original
+// nested inventory view) alongside the tiles/list pair the compendium uses.
+func normalizeVaultView(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case vaultViewList:
+		return vaultViewList
+	case vaultViewTree:
+		return vaultViewTree
+	default:
+		return vaultViewTiles
+	}
+}
+
+// newFilterBar builds the shared filter bar view model. ResetURL is always the
+// bare action URL: resetting means dropping every query parameter, which is
+// exactly what an unqualified GET to the action does.
+func newFilterBar(action, view string, views []string, filters application.CompendiumFilters, browse application.ItemBrowse) FilterBarData {
+	return FilterBarData{
+		Action:     action,
+		ResetURL:   action,
+		View:       view,
+		Views:      views,
+		Filters:    filters,
+		Facets:     browse.Facets,
+		Categories: domain.Categories(),
+		Rarities:   domain.Rarities(),
+		MatchCount: browse.MatchCount,
+		TotalCount: browse.TotalCount,
+	}
+}
+
+// checkboxField is the view model for the checkbox_field partial, which
+// renders every checkbox in the app as inline "Field name: []" (issue #18,
+// comment #345). Value is empty for a simple boolean flag and set for a
+// multi-value group such as weapon_properties; Legacy marks an option that
+// isn't part of the canonical vocabulary (e.g. a free-text weapon property
+// kept from an earlier entry).
+type checkboxField struct {
+	Label, Name, Value, Hint string
+	Checked, Legacy          bool
+}
+
+// checkbox builds a simple boolean checkbox field.
+func checkbox(label, name string, checked bool) checkboxField {
+	return checkboxField{Label: label, Name: name, Checked: checked}
+}
+
+// weaponPropertyCheckbox adapts a resolved weapon property choice into a
+// checkbox field, carrying its value, description-as-hint, and legacy state.
+func weaponPropertyCheckbox(choice domain.WeaponPropertyChoice) checkboxField {
+	hint := choice.Description
+	if hint == "" {
+		hint = "Custom value kept from an earlier entry."
+	}
+	return checkboxField{
+		Label:   choice.Label,
+		Name:    "weapon_properties",
+		Value:   choice.Key,
+		Hint:    hint,
+		Checked: choice.Selected,
+		Legacy:  !choice.Known,
+	}
 }
 
 // weaponPropertyChip is one rendered pill plus the id its tooltip is wired to
@@ -138,6 +233,9 @@ func NewServer(service *application.Service) (*Server, error) {
 		"weaponPropertyChips": weaponPropertyChips,
 		// Generates the bulk-import format spec from the live vocabulary.
 		"bulkFormatSpec": domain.BulkFormatSpec,
+		// Build checkbox_field view models (see checkboxField's doc comment).
+		"checkbox":               checkbox,
+		"weaponPropertyCheckbox": weaponPropertyCheckbox,
 	}
 
 	tmpl, err := template.New("pages").Funcs(funcs).ParseFS(webassets.FS, "templates/*.html")
@@ -260,22 +358,40 @@ func (s *Server) handleVaults(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleVaultRoutes(w http.ResponseWriter, r *http.Request) {
-	switch {
-	case strings.HasSuffix(r.URL.Path, "/purse"):
-		s.handleVaultPurse(w, r)
-	default:
-		s.handleVaultDetail(w, r)
+// vaultRouteAction splits a /vaults/{id}[/{action}] path into its parts,
+// tolerating a trailing slash. Returns an empty id for a malformed path (bare
+// /vaults/ has no id to dispatch on).
+func vaultRouteAction(path string) (id, action string) {
+	trimmed := strings.Trim(strings.TrimPrefix(path, "/vaults/"), "/")
+	if trimmed == "" {
+		return "", ""
 	}
+	if slash := strings.Index(trimmed, "/"); slash >= 0 {
+		return trimmed[:slash], trimmed[slash+1:]
+	}
+	return trimmed, ""
 }
 
-func (s *Server) handleVaultDetail(w http.ResponseWriter, r *http.Request) {
-	id := pathSegment(r.URL.Path, "/vaults/")
+func (s *Server) handleVaultRoutes(w http.ResponseWriter, r *http.Request) {
+	id, action := vaultRouteAction(r.URL.Path)
 	if id == "" {
 		http.NotFound(w, r)
 		return
 	}
 
+	switch action {
+	case "":
+		s.handleVaultDetail(w, r, id)
+	case "edit":
+		s.handleVaultEdit(w, r, id)
+	case "purse":
+		s.handleVaultPurse(w, r, id)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func (s *Server) handleVaultDetail(w http.ResponseWriter, r *http.Request, id string) {
 	if r.Method == http.MethodPost {
 		strength, err := parseIntField(r.FormValue("strength_score"))
 		if err != nil {
@@ -303,8 +419,11 @@ func (s *Server) handleVaultDetail(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			s.render(w, "vault_detail", http.StatusBadRequest, TemplateData{
-				Title:       "Vault",
+			// Edits live on /vaults/{id}/edit now, so a rejected save must
+			// re-render that page -- not the read-only detail page, which no
+			// longer has a form on it at all.
+			s.render(w, "vault_edit", http.StatusBadRequest, TemplateData{
+				Title:       "Edit Vault",
 				Error:       err.Error(),
 				AppSettings: data.Settings,
 				VaultDetail: data,
@@ -322,21 +441,66 @@ func (s *Server) handleVaultDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	filters := parseCompendiumFilters(r)
+	view := normalizeVaultView(r.URL.Query().Get("view"))
+	action := "/vaults/" + id
+
+	browse, err := s.service.BrowseVault(r.Context(), id, filters)
+	if err != nil {
+		// A malformed filter value is user error, not a server fault: re-render
+		// the browser with the message so the DM can correct the field, mirroring
+		// handleCompendium's error branch.
+		s.render(w, "vault_detail", http.StatusBadRequest, TemplateData{
+			Title:       data.Summary.Vault.CharacterName,
+			Error:       err.Error(),
+			AppSettings: data.Settings,
+			VaultDetail: data,
+			VaultView:   view,
+			FilterBar:   newFilterBar(action, view, vaultViews, filters, application.ItemBrowse{}),
+		})
+		return
+	}
+
 	s.render(w, "vault_detail", http.StatusOK, TemplateData{
 		Title:       data.Summary.Vault.CharacterName,
 		Notice:      r.URL.Query().Get("notice"),
 		AppSettings: data.Settings,
 		VaultDetail: data,
+		VaultBrowse: browse,
+		VaultView:   view,
+		FilterBar:   newFilterBar(action, view, vaultViews, filters, browse),
 	})
 }
 
-func (s *Server) handleVaultPurse(w http.ResponseWriter, r *http.Request) {
+// handleVaultEdit renders the vault settings + purse forms that used to live
+// directly on the detail page (issue #18): edits now sit behind this
+// dedicated page, reached via an "Edit vault" button. The forms themselves
+// still post to the unchanged /vaults/{id} and /vaults/{id}/purse routes.
+func (s *Server) handleVaultEdit(w http.ResponseWriter, r *http.Request, id string) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	data, err := s.service.GetVaultDetail(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	s.render(w, "vault_edit", http.StatusOK, TemplateData{
+		Title:       "Edit " + data.Summary.Vault.CharacterName,
+		AppSettings: data.Settings,
+		VaultDetail: data,
+	})
+}
+
+func (s *Server) handleVaultPurse(w http.ResponseWriter, r *http.Request, id string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	id := pathSegment(strings.TrimSuffix(r.URL.Path, "/purse"), "/vaults/")
 	purse, err := parsePurse(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -371,6 +535,7 @@ func (s *Server) handleCompendium(w http.ResponseWriter, r *http.Request) {
 			Rarities:          domain.Rarities(),
 			CompendiumFilters: filters,
 			CompendiumView:    view,
+			FilterBar:         newFilterBar("/compendium", view, compendiumViews, filters, application.ItemBrowse{}),
 		})
 		return
 	}
@@ -384,6 +549,7 @@ func (s *Server) handleCompendium(w http.ResponseWriter, r *http.Request) {
 		Compendium:        browse,
 		CompendiumFilters: filters,
 		CompendiumView:    view,
+		FilterBar:         newFilterBar("/compendium", view, compendiumViews, filters, browse),
 	})
 }
 

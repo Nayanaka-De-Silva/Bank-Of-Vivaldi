@@ -1,12 +1,12 @@
 {{define "dashboard"}}
 {{template "page_top" .}}
-<section class="hero">
+<section class="mb-5 rounded-xl border border-edge bg-panel p-5">
   <h1>Campaign dashboard</h1>
   <p>Track vault weight, purse totals, and the compendium from one chrome-clean control panel.</p>
 </section>
 
-<section class="grid two">
-  <article class="panel">
+<section class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
+  <article class="mb-5 rounded-xl border border-edge bg-panel p-5">
     <h2>Vault summaries</h2>
     {{if .Dashboard.Vaults}}
       <table>
@@ -36,7 +36,7 @@
     {{end}}
   </article>
 
-  <article class="panel">
+  <article class="mb-5 rounded-xl border border-edge bg-panel p-5">
     <h2>Compendium</h2>
     <p><strong>Total weight:</strong> {{weight .Dashboard.CompendiumWeight}} lb</p>
     <p><strong>Total value:</strong> {{gp .Dashboard.CompendiumValueCP}}</p>

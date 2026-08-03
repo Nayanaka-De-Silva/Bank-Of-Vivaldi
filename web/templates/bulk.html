@@ -1,11 +1,11 @@
 {{define "bulk"}}
 {{template "page_top" .}}
-<section class="grid two">
-  <article class="panel">
+<section class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
+  <article class="mb-5 rounded-xl border border-edge bg-panel p-5">
     <h1>Bulk item entry</h1>
     <p>One item per line. Extended format:</p>
-    <pre style="font-size:0.8em;overflow-x:auto">[qty]Name | category | rarity | weight_lb | value | description | key=value ...</pre>
-    <ul style="font-size:0.85em;margin:0.25em 0 0.5em">
+    <pre class="overflow-x-auto text-[0.8em]">[qty]Name | category | rarity | weight_lb | value | description | key=value ...</pre>
+    <ul class="mt-1 mb-2 list-disc pl-5 text-[0.85em]">
       <li><strong>value</strong>: denominated (2gp, 50sp, 1,000gp) or bare integer (copper)</li>
       <li><strong>key=value</strong>: weapon, armor, tool, mount/vehicle, container, or per-row override attributes</li>
       <li>Unknown key-shaped segments (<code>dmg=1d4</code>) are errors; plain prose becomes description</li>
@@ -13,8 +13,8 @@
       <li><code>container=true/false</code> = IsContainer flag; <code>parent=BackpackName</code> = destination container</li>
     </ul>
     <details>
-      <summary style="cursor:pointer;font-size:0.85em">Format spec (copy to AI agent)</summary>
-      <textarea data-bulk-format-spec readonly rows="20" style="width:100%;font-size:0.75em;font-family:monospace">{{bulkFormatSpec}}</textarea>
+      <summary class="cursor-pointer text-[0.85em]">Format spec (copy to AI agent)</summary>
+      <textarea data-bulk-format-spec readonly rows="20" class="font-mono text-[0.75em]">{{bulkFormatSpec}}</textarea>
       <button type="button" data-copy-format-spec>Copy format spec</button>
     </details>
     <script>
@@ -33,11 +33,11 @@
       });
     })();
     </script>
-    <form method="post" action="/bulk/preview" class="stack">
+    <form method="post" action="/bulk/preview" class="flex flex-col gap-3.5">
       <label>Lines
         <textarea name="bulk_text" rows="16">{{.BulkText}}</textarea>
       </label>
-      <div class="grid two">
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
         <label>Default category
           <select name="default_category">
             <option value="">--</option>
@@ -58,7 +58,7 @@
         <fieldset>
           <legend>Default value</legend>
           {{with breakdownCP .BulkDefaultsValue}}
-          <div class="grid five">
+          <div class="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-4">
             <label>pp <input type="number" name="default_pp" value="{{.PP}}" min="0"></label>
             <label>gp <input type="number" name="default_gp" value="{{.GP}}" min="0"></label>
             <label>ep <input type="number" name="default_ep" value="{{.EP}}" min="0"></label>
@@ -68,7 +68,7 @@
           {{end}}
         </fieldset>
       </div>
-      <div class="grid three">
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
         <label>Location kind
           <select name="location_kind">
             <option value="compendium" {{if eq .SelectedLocationKind "compendium"}}selected{{end}}>Compendium root</option>
@@ -100,18 +100,18 @@
           <option value="imported" {{if eq .BulkSourceKind "imported"}}selected{{end}}>Imported</option>
         </select>
       </label>
-      <label><input type="checkbox" name="is_stackable" {{if .BulkIsStackable}}checked{{end}}> Mark imported rows as stackable</label>
-      <label><input type="checkbox" name="is_magical" {{if .BulkIsMagical}}checked{{end}}> Mark imported rows as magical</label>
-      <label><input type="checkbox" name="requires_attunement" {{if .BulkRequiresAttunement}}checked{{end}}> Mark imported rows as requiring attunement</label>
-      <label><input type="checkbox" name="is_equipped" {{if .BulkIsEquipped}}checked{{end}}> Mark imported rows as equipped</label>
+      {{template "checkbox_field" (checkbox "Mark imported rows as stackable" "is_stackable" .BulkIsStackable)}}
+      {{template "checkbox_field" (checkbox "Mark imported rows as magical" "is_magical" .BulkIsMagical)}}
+      {{template "checkbox_field" (checkbox "Mark imported rows as requiring attunement" "requires_attunement" .BulkRequiresAttunement)}}
+      {{template "checkbox_field" (checkbox "Mark imported rows as equipped" "is_equipped" .BulkIsEquipped)}}
       <button type="submit">Preview import</button>
     </form>
   </article>
 
-  <article class="panel">
+  <article class="mb-5 rounded-xl border border-edge bg-panel p-5">
     <h2>Preview</h2>
     {{if .BulkPreview.Rows}}
-      <div style="overflow-x:auto">
+      <div class="overflow-x-auto">
       <table>
         <thead>
           <tr>
@@ -145,13 +145,13 @@
                 {{with .Details.Tool}}{{.ToolCategory}}{{end}}
                 {{with .Details.Treasure}}{{.TreasureKind}}{{end}}
               </small></td>
-              <td>{{if .Errors}}{{range .Errors}}<div class="error-inline">{{.}}</div>{{end}}{{else}}ready{{end}}</td>
+              <td>{{if .Errors}}{{range .Errors}}<div class="text-[#ffd7d7]">{{.}}</div>{{end}}{{else}}ready{{end}}</td>
             </tr>
           {{end}}
         </tbody>
       </table>
       </div>
-      <form method="post" action="/bulk/commit" class="stack">
+      <form method="post" action="/bulk/commit" class="flex flex-col gap-3.5">
         <input type="hidden" name="encoded_rows" value="{{.EncodedRows}}">
         <input type="hidden" name="location_kind" value="{{.SelectedLocationKind}}">
         <input type="hidden" name="vault_id" value="{{.SelectedVaultID}}">

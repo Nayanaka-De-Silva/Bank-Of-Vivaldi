@@ -1,8 +1,8 @@
 {{define "search"}}
 {{template "page_top" .}}
-<section class="panel">
+<section class="mb-5 rounded-xl border border-edge bg-panel p-5">
   <h1>Search inventory</h1>
-  <form method="get" action="/search" class="grid three">
+  <form method="get" action="/search" class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
     <label>Query <input type="text" name="q" value="{{.Filters.Query}}"></label>
     <label>Category
       <select name="category">
@@ -38,7 +38,7 @@
         <option value="rarity" {{if eq .Filters.SortBy "rarity"}}selected{{end}}>Rarity</option>
       </select>
     </label>
-    <div class="grid-span"><button type="submit">Search</button></div>
+    <div class="col-span-full"><button type="submit">Search</button></div>
   </form>
 
   <table>
