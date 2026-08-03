@@ -1015,6 +1015,23 @@ func TestItemTableShowsLocationLabelForRootEntries(t *testing.T) {
 	}
 }
 
+func TestItemTableWrapsTableInOverflowContainer(t *testing.T) {
+	t.Parallel()
+
+	entries := []application.ItemEntry{{
+		Item:          domain.Item{ID: "torch-1", Name: "Torch", Category: "equipment"},
+		LocationLabel: "Vault root",
+		UnitWeightLB:  "1",
+		UnitValueText: "1 cp",
+	}}
+
+	html := renderPartial(t, "item_table", entries)
+
+	if !strings.Contains(html, `<div class="overflow-x-auto">`) {
+		t.Fatalf("expected item_table to wrap its table in an overflow-x-auto container, got:\n%s", html)
+	}
+}
+
 func renderCompendium(t *testing.T, data TemplateData) string {
 	t.Helper()
 
