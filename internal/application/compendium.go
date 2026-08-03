@@ -139,10 +139,15 @@ func (f CompendiumFilters) Criteria() (domain.CompendiumCriteria, error) {
 	return criteria, nil
 }
 
-// CompendiumEntry is one row or tile in the compendium browser.
-type CompendiumEntry struct {
+// ItemEntry is one row or tile in any filtered item browser -- the compendium
+// or a vault. LocationLabel carries the browser's own root label ("Compendium
+// root" / "Vault root") for entries that aren't nested in a container, so the
+// shared item_table partial can show a location for both browsers without
+// needing to know which one it's rendering.
+type ItemEntry struct {
 	Item           domain.Item
 	ContainerPath  string
+	LocationLabel  string
 	IsNested       bool
 	UnitWeightLB   string
 	UnitValueText  string
@@ -150,59 +155,78 @@ type CompendiumEntry struct {
 	TotalValueText string
 }
 
-// CompendiumBrowse is the rendered state of the compendium browser.
-type CompendiumBrowse struct {
+// ItemBrowse is the rendered state of a filtered item browser.
+type ItemBrowse struct {
 	Settings   domain.AppSettings
-	Entries    []CompendiumEntry
+	Entries    []ItemEntry
 	Facets     domain.CompendiumFacets
 	TotalCount int
 	MatchCount int
 }
 
+// CompendiumEntry and CompendiumBrowse are back-compat aliases for ItemEntry
+// and ItemBrowse, kept so existing call sites and tests written against the
+// compendium-specific names keep compiling unchanged.
+type CompendiumEntry = ItemEntry
+type CompendiumBrowse = ItemBrowse
+
 // BrowseCompendium lists every compendium-held item, including items nested inside
 // compendium containers, narrowed by the supplied filters.
-func (s *Service) BrowseCompendium(ctx context.Context, filters CompendiumFilters) (CompendiumBrowse, error) {
+func (s *Service) BrowseCompendium(ctx context.Context, filters CompendiumFilters) (ItemBrowse, error) {
+	return s.browseItems(ctx, filters, compendiumScopedItems, "Compendium root")
+}
+
+// browseItems is the engine behind every filtered item browser. `scope` selects
+// which items the browser owns (the compendium or a single vault); criteria
+// parsing, sorting, facets and counts are identical for all of them.
+func (s *Service) browseItems(ctx context.Context, filters CompendiumFilters, scope func([]domain.Item) []domain.Item, rootLabel string) (ItemBrowse, error) {
 	criteria, err := filters.Criteria()
 	if err != nil {
-		return CompendiumBrowse{}, err
+		return ItemBrowse{}, err
 	}
 
 	settings, err := s.store.GetAppSettings(ctx)
 	if err != nil {
-		return CompendiumBrowse{}, err
+		return ItemBrowse{}, err
 	}
 
 	allItems, err := s.store.ListItems(ctx)
 	if err != nil {
-		return CompendiumBrowse{}, err
+		return ItemBrowse{}, err
 	}
 
-	scoped := compendiumScopedItems(allItems)
-	entries := make([]CompendiumEntry, 0, len(scoped))
+	scoped := scope(allItems)
+	entries := make([]ItemEntry, 0, len(scoped))
 	for _, item := range scoped {
 		if !criteria.Matches(item) {
 			continue
 		}
-		entries = append(entries, CompendiumEntry{
+		isNested := item.Location.ParentContainerItemID != ""
+		entry := ItemEntry{
 			Item:           item,
-			ContainerPath:  buildContainerPath(item, allItems),
-			IsNested:       item.Location.ParentContainerItemID != "",
+			IsNested:       isNested,
 			UnitWeightLB:   domain.FormatWeightHundredths(item.UnitWeightHundredthsLB()),
 			UnitValueText:  domain.FormatCopperAsGold(item.BaseValueCP),
 			TotalWeightLB:  domain.FormatWeightHundredths(item.TotalWeightHundredthsLB()),
 			TotalValueText: domain.FormatCopperAsGold(item.TotalValueCP()),
-		})
+		}
+		if isNested {
+			entry.ContainerPath = buildContainerPath(item, allItems)
+		} else {
+			entry.LocationLabel = rootLabel
+		}
+		entries = append(entries, entry)
 	}
 
 	sort.SliceStable(entries, func(i, j int) bool {
 		return compendiumEntryLess(entries[i].Item, entries[j].Item, filters.SortBy)
 	})
 
-	return CompendiumBrowse{
+	return ItemBrowse{
 		Settings: settings,
 		Entries:  entries,
-		// Facets describe the whole compendium so the dropdowns stay usable after
-		// a filter narrows the result set.
+		// Facets describe every item the browser owns, not just the filtered
+		// result, so the dropdowns stay usable after a filter narrows the list.
 		Facets:     domain.BuildCompendiumFacets(scoped),
 		TotalCount: len(scoped),
 		MatchCount: len(entries),
