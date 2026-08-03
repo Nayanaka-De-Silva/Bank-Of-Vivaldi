@@ -305,3 +305,90 @@ func TestVaultDetailEmptyResultExplainsTheFilter(t *testing.T) {
 		t.Fatalf("expected an empty-result message, got:\n%s", html)
 	}
 }
+
+// TestVaultDetailTreeViewRendersContainerWithChildrenAsDisclosure asserts that a
+// container ItemNode with non-empty Children renders a <details>/<summary>
+// disclosure rather than a plain flat row, and that the child item's name
+// appears in the output.
+func TestVaultDetailTreeViewRendersContainerWithChildrenAsDisclosure(t *testing.T) {
+	t.Parallel()
+
+	backpack := domain.Item{
+		ID:          "backpack",
+		Name:        "Backpack",
+		Category:    "container",
+		Rarity:      domain.RarityMundane,
+		IsContainer: true,
+	}
+	dagger := domain.Item{ID: "dagger", Name: "Dagger", Category: "weapon", Rarity: domain.RarityMundane}
+
+	data := vaultTemplateDataWithView(vaultViewTree, application.CompendiumFilters{})
+	data.VaultDetail.RootItems = []application.ItemNode{
+		{
+			Item: backpack,
+			Children: []application.ItemNode{
+				{Item: dagger},
+			},
+		},
+	}
+
+	html := renderVaultDetail(t, data)
+
+	if !strings.Contains(html, "item-tree") {
+		t.Fatalf("expected item-tree class in tree view, got:\n%s", html)
+	}
+	if !strings.Contains(html, "<details") {
+		t.Fatalf("expected a <details> disclosure element for the container, got:\n%s", html)
+	}
+	if !strings.Contains(html, "<summary") {
+		t.Fatalf("expected a <summary> element for the container header, got:\n%s", html)
+	}
+	if !strings.Contains(html, "Dagger") {
+		t.Fatalf("expected the child item name to appear in the rendered output, got:\n%s", html)
+	}
+	if strings.Contains(html, "data-card-grid") || strings.Contains(html, "<table") {
+		t.Fatalf("expected no card grid or table in tree view, got:\n%s", html)
+	}
+}
+
+// TestVaultDetailTreeViewNestedContainerStartsCollapsed asserts the depth rule:
+// a top-level container renders <details open> while a container nested inside
+// another container renders <details> WITHOUT the open attribute (collapsed by
+// default).
+func TestVaultDetailTreeViewNestedContainerStartsCollapsed(t *testing.T) {
+	t.Parallel()
+
+	chest := domain.Item{ID: "chest", Name: "Chest", Category: "container", Rarity: domain.RarityMundane, IsContainer: true}
+	innerBag := domain.Item{ID: "bag", Name: "Bag of Holding", Category: "container", Rarity: domain.RarityRare, IsContainer: true}
+	dagger := domain.Item{ID: "dagger", Name: "Dagger", Category: "weapon", Rarity: domain.RarityMundane}
+
+	data := vaultTemplateDataWithView(vaultViewTree, application.CompendiumFilters{})
+	data.VaultDetail.RootItems = []application.ItemNode{
+		{
+			Item: chest,
+			Children: []application.ItemNode{
+				{
+					Item: innerBag,
+					Children: []application.ItemNode{
+						{Item: dagger},
+					},
+				},
+			},
+		},
+	}
+
+	html := renderVaultDetail(t, data)
+
+	// Top-level container must render with the open attribute.
+	if !strings.Contains(html, `<details class="group" open>`) {
+		t.Fatalf("expected top-level container to render with open attribute, got:\n%s", html)
+	}
+	// Nested container must render WITHOUT the open attribute (collapsed).
+	if !strings.Contains(html, `<details class="group">`) {
+		t.Fatalf("expected nested container to render without open attribute, got:\n%s", html)
+	}
+	// The leaf item must still appear in the output (nested inside collapsed disclosure).
+	if !strings.Contains(html, "Dagger") {
+		t.Fatalf("expected leaf item name to appear in the output, got:\n%s", html)
+	}
+}
