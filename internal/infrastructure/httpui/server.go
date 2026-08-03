@@ -300,22 +300,40 @@ func (s *Server) handleVaults(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleVaultRoutes(w http.ResponseWriter, r *http.Request) {
-	switch {
-	case strings.HasSuffix(r.URL.Path, "/purse"):
-		s.handleVaultPurse(w, r)
-	default:
-		s.handleVaultDetail(w, r)
+// vaultRouteAction splits a /vaults/{id}[/{action}] path into its parts,
+// tolerating a trailing slash. Returns an empty id for a malformed path (bare
+// /vaults/ has no id to dispatch on).
+func vaultRouteAction(path string) (id, action string) {
+	trimmed := strings.Trim(strings.TrimPrefix(path, "/vaults/"), "/")
+	if trimmed == "" {
+		return "", ""
 	}
+	if slash := strings.Index(trimmed, "/"); slash >= 0 {
+		return trimmed[:slash], trimmed[slash+1:]
+	}
+	return trimmed, ""
 }
 
-func (s *Server) handleVaultDetail(w http.ResponseWriter, r *http.Request) {
-	id := pathSegment(r.URL.Path, "/vaults/")
+func (s *Server) handleVaultRoutes(w http.ResponseWriter, r *http.Request) {
+	id, action := vaultRouteAction(r.URL.Path)
 	if id == "" {
 		http.NotFound(w, r)
 		return
 	}
 
+	switch action {
+	case "":
+		s.handleVaultDetail(w, r, id)
+	case "edit":
+		s.handleVaultEdit(w, r, id)
+	case "purse":
+		s.handleVaultPurse(w, r, id)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func (s *Server) handleVaultDetail(w http.ResponseWriter, r *http.Request, id string) {
 	if r.Method == http.MethodPost {
 		strength, err := parseIntField(r.FormValue("strength_score"))
 		if err != nil {
@@ -343,8 +361,11 @@ func (s *Server) handleVaultDetail(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			s.render(w, "vault_detail", http.StatusBadRequest, TemplateData{
-				Title:       "Vault",
+			// Edits live on /vaults/{id}/edit now, so a rejected save must
+			// re-render that page -- not the read-only detail page, which no
+			// longer has a form on it at all.
+			s.render(w, "vault_edit", http.StatusBadRequest, TemplateData{
+				Title:       "Edit Vault",
 				Error:       err.Error(),
 				AppSettings: data.Settings,
 				VaultDetail: data,
@@ -370,13 +391,35 @@ func (s *Server) handleVaultDetail(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleVaultPurse(w http.ResponseWriter, r *http.Request) {
+// handleVaultEdit renders the vault settings + purse forms that used to live
+// directly on the detail page (issue #18): edits now sit behind this
+// dedicated page, reached via an "Edit vault" button. The forms themselves
+// still post to the unchanged /vaults/{id} and /vaults/{id}/purse routes.
+func (s *Server) handleVaultEdit(w http.ResponseWriter, r *http.Request, id string) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	data, err := s.service.GetVaultDetail(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	s.render(w, "vault_edit", http.StatusOK, TemplateData{
+		Title:       "Edit " + data.Summary.Vault.CharacterName,
+		AppSettings: data.Settings,
+		VaultDetail: data,
+	})
+}
+
+func (s *Server) handleVaultPurse(w http.ResponseWriter, r *http.Request, id string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	id := pathSegment(strings.TrimSuffix(r.URL.Path, "/purse"), "/vaults/")
 	purse, err := parsePurse(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

@@ -187,6 +187,9 @@
   .relative {
     position: relative;
   }
+  .col-span-full {
+    grid-column: 1 / -1;
+  }
   .container {
     width: 100%;
     @media (width >= 40rem) {
@@ -210,6 +213,9 @@
   }
   .mx-auto {
     margin-inline: auto;
+  }
+  .mt-0 {
+    margin-top: calc(var(--spacing) * 0);
   }
   .mt-1 {
     margin-top: calc(var(--spacing) * 1);
@@ -253,8 +259,14 @@
   .grid-cols-\[repeat\(auto-fill\,minmax\(260px\,1fr\)\)\] {
     grid-template-columns: repeat(auto-fill,minmax(260px,1fr));
   }
+  .grid-cols-\[repeat\(auto-fit\,minmax\(110px\,1fr\)\)\] {
+    grid-template-columns: repeat(auto-fit,minmax(110px,1fr));
+  }
   .grid-cols-\[repeat\(auto-fit\,minmax\(220px\,1fr\)\)\] {
     grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
+  }
+  .grid-cols-\[repeat\(auto-fit\,minmax\(320px\,1fr\)\)\] {
+    grid-template-columns: repeat(auto-fit,minmax(320px,1fr));
   }
   .flex-col {
     flex-direction: column;
