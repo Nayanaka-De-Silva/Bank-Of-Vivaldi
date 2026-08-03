@@ -28,10 +28,13 @@ type TemplateData struct {
 	Dashboard                 application.DashboardData
 	Vaults                    []application.VaultSummary
 	VaultDetail               application.VaultDetail
+	VaultBrowse               application.ItemBrowse
+	VaultView                 string
 	ItemDetail                application.ItemDetail
 	Compendium                application.CompendiumBrowse
 	CompendiumFilters         application.CompendiumFilters
 	CompendiumView            string
+	FilterBar                 FilterBarData
 	SearchResults             []application.SearchResult
 	BulkPreview               domain.BulkPreview
 	BulkText                  string
@@ -78,6 +81,43 @@ func rarityClass(value any) string {
 
 func containerMetadataVisible(category string, isContainer bool) bool {
 	return isContainer || itemMetadataVisible(category, "container")
+}
+
+// FilterBarData is the view model for the item_filter_bar partial shared by
+// the compendium and vault browsers. A Go template has a single dot, and the
+// filter bar needs filters, facets, vocabulary and its own action/reset URLs
+// all at once, so it gets a dedicated struct rather than a funcMap dict hack.
+type FilterBarData struct {
+	Action     string
+	ResetURL   string
+	View       string
+	Views      []string
+	Filters    application.CompendiumFilters
+	Facets     domain.CompendiumFacets
+	Categories []string
+	Rarities   []string
+	MatchCount int
+	TotalCount int
+}
+
+var compendiumViews = []string{compendiumViewTiles, compendiumViewList}
+
+// newFilterBar builds the shared filter bar view model. ResetURL is always the
+// bare action URL: resetting means dropping every query parameter, which is
+// exactly what an unqualified GET to the action does.
+func newFilterBar(action, view string, views []string, filters application.CompendiumFilters, browse application.ItemBrowse) FilterBarData {
+	return FilterBarData{
+		Action:     action,
+		ResetURL:   action,
+		View:       view,
+		Views:      views,
+		Filters:    filters,
+		Facets:     browse.Facets,
+		Categories: domain.Categories(),
+		Rarities:   domain.Rarities(),
+		MatchCount: browse.MatchCount,
+		TotalCount: browse.TotalCount,
+	}
 }
 
 // weaponPropertyChip is one rendered pill plus the id its tooltip is wired to
@@ -371,6 +411,7 @@ func (s *Server) handleCompendium(w http.ResponseWriter, r *http.Request) {
 			Rarities:          domain.Rarities(),
 			CompendiumFilters: filters,
 			CompendiumView:    view,
+			FilterBar:         newFilterBar("/compendium", view, compendiumViews, filters, application.ItemBrowse{}),
 		})
 		return
 	}
@@ -384,6 +425,7 @@ func (s *Server) handleCompendium(w http.ResponseWriter, r *http.Request) {
 		Compendium:        browse,
 		CompendiumFilters: filters,
 		CompendiumView:    view,
+		FilterBar:         newFilterBar("/compendium", view, compendiumViews, filters, browse),
 	})
 }
 

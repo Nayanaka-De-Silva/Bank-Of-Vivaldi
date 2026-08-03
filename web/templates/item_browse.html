@@ -1,0 +1,286 @@
+{{/* Shared by the compendium and vault browsers (issue #18): one filter form,
+     one card grid, one table, so the two screens stay visually congruent. */}}
+{{define "item_filter_bar"}}
+<form method="get" action="{{.Action}}" class="flex flex-col gap-3.5" data-compendium-filters>
+  <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+    <label>Search <input type="text" name="q" value="{{.Filters.Query}}" placeholder="Name or description"></label>
+    <label>Category
+      <select name="category">
+        <option value="">Any</option>
+        {{range .Categories}}
+          <option value="{{.}}" {{if eq $.Filters.Category .}}selected{{end}}>{{humanize .}}</option>
+        {{end}}
+      </select>
+    </label>
+    <label>Rarity
+      <select name="rarity">
+        <option value="">Any</option>
+        {{range .Rarities}}
+          <option value="{{.}}" {{if eq $.Filters.Rarity .}}selected{{end}}>{{humanize .}}</option>
+        {{end}}
+      </select>
+    </label>
+    <label>Min weight (lb) <input type="text" name="min_weight_lb" value="{{.Filters.MinWeightLB}}" inputmode="decimal"></label>
+    <label>Max weight (lb) <input type="text" name="max_weight_lb" value="{{.Filters.MaxWeightLB}}" inputmode="decimal"></label>
+    <label>Min value (gp) <input type="text" name="min_value_gp" value="{{.Filters.MinValueGP}}" inputmode="decimal"></label>
+    <label>Max value (gp) <input type="text" name="max_value_gp" value="{{.Filters.MaxValueGP}}" inputmode="decimal"></label>
+    <label>Magical
+      <select name="magical">
+        {{template "tristate_options" .Filters.Magical}}
+      </select>
+    </label>
+    <label>Attunement
+      <select name="attunement">
+        {{template "tristate_options" .Filters.Attunement}}
+      </select>
+    </label>
+    <label>Sort
+      <select name="sort">
+        <option value="name" {{if eq .Filters.SortBy "name"}}selected{{end}}>Name</option>
+        <option value="category" {{if eq .Filters.SortBy "category"}}selected{{end}}>Category</option>
+        <option value="rarity" {{if eq .Filters.SortBy "rarity"}}selected{{end}}>Rarity</option>
+        <option value="weight" {{if eq .Filters.SortBy "weight"}}selected{{end}}>Weight</option>
+        <option value="value" {{if eq .Filters.SortBy "value"}}selected{{end}}>Value</option>
+        <option value="updated" {{if eq .Filters.SortBy "updated"}}selected{{end}}>Recently updated</option>
+      </select>
+    </label>
+  </div>
+
+  <section class="flex flex-col gap-3.5" data-filter-groups {{if not .Filters.ActiveCategory}}hidden{{end}}>
+    <section class="flex flex-col gap-3.5 rounded-lg border border-edge bg-panel-2 p-4" data-filter-group="armor" {{if not (.Filters.ShowsGroup "armor")}}hidden{{end}}>
+      <h3 class="m-0 text-base">Armor filters</h3>
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+        <label>Armor category
+          <select name="armor_category">
+            <option value="">Any</option>
+            {{range .Facets.ArmorCategories}}
+              <option value="{{.}}" {{if eq $.Filters.ArmorCategory .}}selected{{end}}>{{humanize .}}</option>
+            {{end}}
+          </select>
+        </label>
+        <label>Dex modifier behavior
+          <select name="armor_dex_behavior">
+            <option value="">Any</option>
+            {{range .Facets.ArmorDexBehaviors}}
+              <option value="{{.}}" {{if eq $.Filters.ArmorDexBehavior .}}selected{{end}}>{{humanize .}}</option>
+            {{end}}
+          </select>
+        </label>
+        <label>Stealth disadvantage
+          <select name="armor_stealth">
+            {{template "tristate_options" .Filters.ArmorStealth}}
+          </select>
+        </label>
+        <label>Min base AC <input type="number" name="armor_min_ac" value="{{.Filters.ArmorMinAC}}"></label>
+        <label>Max base AC <input type="number" name="armor_max_ac" value="{{.Filters.ArmorMaxAC}}"></label>
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-3.5 rounded-lg border border-edge bg-panel-2 p-4" data-filter-group="weapon" {{if not (.Filters.ShowsGroup "weapon")}}hidden{{end}}>
+      <h3 class="m-0 text-base">Weapon filters</h3>
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+        <label>Weapon category
+          <select name="weapon_category">
+            <option value="">Any</option>
+            {{range weaponCategories}}
+              <option value="{{.}}" {{if eq $.Filters.WeaponCategory .}}selected{{end}}>{{humanize .}}</option>
+            {{end}}
+          </select>
+        </label>
+        <label>Damage type
+          <select name="weapon_damage_type">
+            <option value="">Any</option>
+            {{range .Facets.WeaponDamageTypes}}
+              <option value="{{.}}" {{if eq $.Filters.WeaponDamageType .}}selected{{end}}>{{humanize .}}</option>
+            {{end}}
+          </select>
+        </label>
+        <label>Property
+          <select name="weapon_property">
+            <option value="">Any</option>
+            {{range weaponPropertyOptions $.Facets.WeaponProperties}}
+              <option value="{{.}}" {{if eq $.Filters.WeaponProperty .}}selected{{end}}>{{humanize .}}</option>
+            {{end}}
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-3.5 rounded-lg border border-edge bg-panel-2 p-4" data-filter-group="container" {{if not (.Filters.ShowsGroup "container")}}hidden{{end}}>
+      <h3 class="m-0 text-base">Container filters</h3>
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+        <label>Min capacity (lb) <input type="text" name="container_min_capacity_lb" value="{{.Filters.ContainerMinCapacityLB}}" inputmode="decimal"></label>
+        <label>Max capacity (lb) <input type="text" name="container_max_capacity_lb" value="{{.Filters.ContainerMaxCapacityLB}}" inputmode="decimal"></label>
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-3.5 rounded-lg border border-edge bg-panel-2 p-4" data-filter-group="tool" {{if not (.Filters.ShowsGroup "tool")}}hidden{{end}}>
+      <h3 class="m-0 text-base">Tool filters</h3>
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+        <label>Tool category
+          <select name="tool_category">
+            <option value="">Any</option>
+            {{range .Facets.ToolCategories}}
+              <option value="{{.}}" {{if eq $.Filters.ToolCategory .}}selected{{end}}>{{humanize .}}</option>
+            {{end}}
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-3.5 rounded-lg border border-edge bg-panel-2 p-4" data-filter-group="mount" {{if not (.Filters.ShowsGroup "mount")}}hidden{{end}}>
+      <h3 class="m-0 text-base">Mount filters</h3>
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+        <label>Mount type
+          <select name="mount_type">
+            <option value="">Any</option>
+            {{range .Facets.MountTypes}}
+              <option value="{{.}}" {{if eq $.Filters.MountType .}}selected{{end}}>{{humanize .}}</option>
+            {{end}}
+          </select>
+        </label>
+        <label>Min speed <input type="number" name="mount_min_speed" value="{{.Filters.MountMinSpeed}}"></label>
+        <label>Max speed <input type="number" name="mount_max_speed" value="{{.Filters.MountMaxSpeed}}"></label>
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-3.5 rounded-lg border border-edge bg-panel-2 p-4" data-filter-group="vehicle" {{if not (.Filters.ShowsGroup "vehicle")}}hidden{{end}}>
+      <h3 class="m-0 text-base">Vehicle filters</h3>
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+        <label>Vehicle type
+          <select name="vehicle_type">
+            <option value="">Any</option>
+            {{range .Facets.VehicleTypes}}
+              <option value="{{.}}" {{if eq $.Filters.VehicleType .}}selected{{end}}>{{humanize .}}</option>
+            {{end}}
+          </select>
+        </label>
+        <label>Min speed <input type="number" name="vehicle_min_speed" value="{{.Filters.VehicleMinSpeed}}"></label>
+        <label>Max speed <input type="number" name="vehicle_max_speed" value="{{.Filters.VehicleMaxSpeed}}"></label>
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-3.5 rounded-lg border border-edge bg-panel-2 p-4" data-filter-group="treasure" {{if not (.Filters.ShowsGroup "treasure")}}hidden{{end}}>
+      <h3 class="m-0 text-base">Treasure filters</h3>
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+        <label>Treasure kind
+          <select name="treasure_kind">
+            <option value="">Any</option>
+            {{range .Facets.TreasureKinds}}
+              <option value="{{.}}" {{if eq $.Filters.TreasureKind .}}selected{{end}}>{{humanize .}}</option>
+            {{end}}
+          </select>
+        </label>
+      </div>
+    </section>
+  </section>
+
+  <div class="flex flex-wrap items-center gap-4" data-filter-actions>
+    <button type="submit" name="view" value="{{.View}}">Apply filters</button>
+    <a class="text-muted" href="{{.ResetURL}}">Reset</a>
+    <div class="ml-auto flex overflow-hidden rounded-lg border border-edge" role="group" aria-label="Result layout">
+      {{range .Views}}
+        <button type="submit" name="view" value="{{.}}" class="rounded-none {{if eq $.View .}}bg-accent text-[#051016]{{else}}bg-panel-2 text-muted{{end}} font-semibold" {{if eq $.View .}}aria-pressed="true"{{else}}aria-pressed="false"{{end}}>{{humanize .}}</button>
+      {{end}}
+    </div>
+  </div>
+
+  <script>
+  (() => {
+    const form = document.currentScript.closest("form");
+    if (!form) return;
+
+    const categorySelect = form.querySelector('select[name="category"]');
+    const groupsSection = form.querySelector("[data-filter-groups]");
+    const filterGroups = Array.from(form.querySelectorAll("[data-filter-group]"));
+    if (!categorySelect || filterGroups.length === 0) return;
+
+    const syncFilterGroups = () => {
+      const activeCategory = (categorySelect.value || "").toLowerCase();
+      let hasVisibleGroup = false;
+      filterGroups.forEach((group) => {
+        const visible = group.dataset.filterGroup === activeCategory;
+        group.hidden = !visible;
+        // Disabled inputs are never submitted, so a hidden group cannot leak stale
+        // filters into the query string when the category changes.
+        group.querySelectorAll("input, select, textarea").forEach((input) => {
+          input.disabled = !visible;
+        });
+        if (visible) hasVisibleGroup = true;
+      });
+
+      if (groupsSection) {
+        groupsSection.hidden = !hasVisibleGroup;
+      }
+    };
+
+    categorySelect.addEventListener("change", syncFilterGroups);
+    syncFilterGroups();
+  })();
+  </script>
+</form>
+{{end}}
+
+{{define "tristate_options"}}
+<option value="" {{if eq . ""}}selected{{end}}>Any</option>
+<option value="yes" {{if eq . "yes"}}selected{{end}}>Yes</option>
+<option value="no" {{if eq . "no"}}selected{{end}}>No</option>
+{{end}}
+
+{{define "item_cards"}}
+<div data-card-grid class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
+  {{range .}}
+    {{/* The description is clamped in the tile, so the full text rides along as a tooltip. */}}
+    <article data-item-card class="rarity-accent {{rarityClass .Item.Rarity}} relative flex flex-col gap-1.5 rounded-lg border border-edge bg-panel-2 p-4 hover:border-t-accent hover:border-r-accent hover:border-b-accent focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent"{{if .Item.Description}} title="{{.Item.Description}}"{{end}}>
+      <h3 data-card-title class="m-0 text-[1.05rem]"><a href="/items/{{.Item.ID}}" class="after:absolute after:inset-0 after:rounded-[inherit] after:content-['']">{{.Item.Name}}</a></h3>
+      <p data-card-meta class="m-0 flex flex-wrap gap-1.5 text-sm">
+        <span>{{humanize .Item.Category}}</span>
+        <span class="text-muted">&middot;</span>
+        <span class="rarity-text font-semibold">{{humanize .Item.Rarity}}</span>
+      </p>
+      <p data-card-stats class="m-0 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+        <span>{{.UnitWeightLB}} lb</span>
+        <span class="text-muted">&middot;</span>
+        <span>{{.UnitValueText}}</span>
+        {{if gt .Item.Quantity 1}}<span class="text-muted">&middot;</span><span>{{.Item.Quantity}}x</span>{{end}}
+        {{if .Item.IsMagical}}<span class="rounded-full border border-edge px-1.5 py-0.5 text-[0.72rem] uppercase tracking-wide">Magical</span>{{end}}
+        {{if .Item.RequiresAttunement}}<span class="rounded-full border border-edge px-1.5 py-0.5 text-[0.72rem] uppercase tracking-wide">Attunement</span>{{end}}
+      </p>
+      {{with weaponPropertyChips .Item.ID .Item.Details.Weapon}}{{template "weapon_property_chips" .}}{{end}}
+      {{if .Item.Description}}<p data-card-desc class="mt-1 text-sm leading-relaxed line-clamp-3">{{.Item.Description}}</p>{{end}}
+      {{if .IsNested}}<p class="mt-auto pt-2 text-xs text-muted">In {{.ContainerPath}}</p>{{end}}
+    </article>
+  {{end}}
+</div>
+{{end}}
+
+{{define "item_table"}}
+<table>
+  <thead>
+    <tr>
+      <th>Item</th>
+      <th>Category</th>
+      <th>Rarity</th>
+      <th>Weight</th>
+      <th>Value</th>
+      <th>Qty</th>
+      <th>Location</th>
+      <th>Properties</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .}}
+      <tr>
+        <td><a href="/items/{{.Item.ID}}">{{.Item.Name}}</a></td>
+        <td>{{humanize .Item.Category}}</td>
+        <td><span class="rarity-text {{rarityClass .Item.Rarity}} font-semibold">{{humanize .Item.Rarity}}</span></td>
+        <td>{{.UnitWeightLB}} lb</td>
+        <td>{{.UnitValueText}}</td>
+        <td>{{.Item.Quantity}}</td>
+        <td>{{if .IsNested}}{{.ContainerPath}}{{else}}{{.LocationLabel}}{{end}}</td>
+        <td>{{with weaponPropertyChips .Item.ID .Item.Details.Weapon}}{{template "weapon_property_chips" .}}{{end}}</td>
+      </tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}
