@@ -2,6 +2,8 @@ package httpui
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -38,6 +40,13 @@ func TestVaultRouteActionParsesIDAndAction(t *testing.T) {
 // vaultTemplateData builds a one-vault VaultDetail fixture for vault_detail /
 // vault_edit render tests, modelled on compendiumTemplateData.
 func vaultTemplateData() TemplateData {
+	return vaultTemplateDataWithView(vaultViewTiles, application.CompendiumFilters{})
+}
+
+// vaultTemplateDataWithView builds the same fixture, additionally wiring
+// VaultBrowse/VaultView/FilterBar the way handleVaultDetail's GET branch does,
+// for tests that exercise the filterable tiles/list/tree browser.
+func vaultTemplateDataWithView(view string, filters application.CompendiumFilters) TemplateData {
 	vault := domain.Vault{
 		ID:              "vault-1",
 		CharacterName:   "Aragorn",
@@ -48,6 +57,8 @@ func vaultTemplateData() TemplateData {
 		Purse:           domain.Purse{CP: 1, SP: 2, EP: 0, GP: 30, PP: 1},
 	}
 
+	sword := domain.Item{ID: "sword", Name: "Longsword", Category: "weapon", Rarity: domain.RarityMundane}
+
 	detail := application.VaultDetail{
 		Summary: application.VaultSummary{
 			Vault:                      vault,
@@ -55,14 +66,26 @@ func vaultTemplateData() TemplateData {
 			MaxCarryWeightHundredths:   24000,
 			EncumbranceState:           domain.EncumbranceStateNormal,
 		},
-		RootItems: []application.ItemNode{{
-			Item: domain.Item{ID: "sword", Name: "Longsword", Category: "weapon"},
+		RootItems: []application.ItemNode{{Item: sword}},
+	}
+
+	browse := application.ItemBrowse{
+		Entries: []application.ItemEntry{{
+			Item:          sword,
+			LocationLabel: "Vault root",
+			UnitWeightLB:  "3",
+			UnitValueText: "10 gp",
 		}},
+		TotalCount: 1,
+		MatchCount: 1,
 	}
 
 	return TemplateData{
 		Title:       "Aragorn",
 		VaultDetail: detail,
+		VaultBrowse: browse,
+		VaultView:   view,
+		FilterBar:   newFilterBar("/vaults/vault-1", view, vaultViews, filters, browse),
 	}
 }
 
@@ -149,5 +172,136 @@ func TestVaultEditIsReachableFromTheDetailPage(t *testing.T) {
 	// The edit page itself must link back to the detail page.
 	if !strings.Contains(editHTML, `href="/vaults/vault-1"`) {
 		t.Fatalf("expected the edit page to link back to the detail page, got:\n%s", editHTML)
+	}
+}
+
+func TestNormalizeVaultView(t *testing.T) {
+	t.Parallel()
+
+	if got := normalizeVaultView(""); got != vaultViewTiles {
+		t.Fatalf("default view = %q, want %q", got, vaultViewTiles)
+	}
+	if got := normalizeVaultView("list"); got != vaultViewList {
+		t.Fatalf("view = %q, want %q", got, vaultViewList)
+	}
+	if got := normalizeVaultView("tree"); got != vaultViewTree {
+		t.Fatalf("view = %q, want %q", got, vaultViewTree)
+	}
+	if got := normalizeVaultView("TREE"); got != vaultViewTree {
+		t.Fatalf("uppercase view = %q, want %q (matching normalizeCompendiumView's case-insensitivity)", got, vaultViewTree)
+	}
+	if got := normalizeVaultView("nonsense"); got != vaultViewTiles {
+		t.Fatalf("unknown view = %q, want the tiles default", got)
+	}
+}
+
+func TestVaultFiltersReuseTheCompendiumQueryParams(t *testing.T) {
+	t.Parallel()
+
+	req := httptest.NewRequest(http.MethodGet, "/vaults/vault-1?q=sword&category=weapon", nil)
+	filters := parseCompendiumFilters(req)
+
+	if filters.Query != "sword" || filters.Category != "weapon" {
+		t.Fatalf("filters = %+v, want Query=sword Category=weapon", filters)
+	}
+}
+
+func TestVaultDetailRendersTilesByDefault(t *testing.T) {
+	t.Parallel()
+
+	html := renderVaultDetail(t, vaultTemplateDataWithView(vaultViewTiles, application.CompendiumFilters{}))
+
+	if !strings.Contains(html, "data-card-grid") || !strings.Contains(html, "data-item-card") {
+		t.Fatalf("expected the vault browser to default to cards, got:\n%s", html)
+	}
+	if strings.Contains(html, "<table") {
+		t.Fatalf("expected no table in the default tiles view, got:\n%s", html)
+	}
+	if !strings.Contains(html, ">Longsword<") {
+		t.Fatalf("expected the sword entry to appear on a card, got:\n%s", html)
+	}
+}
+
+func TestVaultDetailListViewRendersTable(t *testing.T) {
+	t.Parallel()
+
+	html := renderVaultDetail(t, vaultTemplateDataWithView(vaultViewList, application.CompendiumFilters{}))
+
+	if !strings.Contains(html, "<table") {
+		t.Fatalf("expected a table in the list view, got:\n%s", html)
+	}
+	if strings.Contains(html, "data-card-grid") {
+		t.Fatalf("expected no card grid in the list view, got:\n%s", html)
+	}
+	if !strings.Contains(html, "Vault root") {
+		t.Fatalf("expected the list view to show the vault-root location label, got:\n%s", html)
+	}
+}
+
+func TestVaultDetailTreeViewRendersTheRecursiveItemNodes(t *testing.T) {
+	t.Parallel()
+
+	html := renderVaultDetail(t, vaultTemplateDataWithView(vaultViewTree, application.CompendiumFilters{}))
+
+	if !strings.Contains(html, "item-tree") {
+		t.Fatalf("expected the tree view to render the recursive item_nodes partial, got:\n%s", html)
+	}
+	if strings.Contains(html, "data-card-grid") || strings.Contains(html, "<table") {
+		t.Fatalf("expected no cards or table in the tree view, got:\n%s", html)
+	}
+}
+
+func TestVaultDetailTreeViewNotesThatFiltersDoNotApply(t *testing.T) {
+	t.Parallel()
+
+	html := renderVaultDetail(t, vaultTemplateDataWithView(vaultViewTree, application.CompendiumFilters{}))
+
+	if !strings.Contains(html, "Filters apply to the tiles and list views") {
+		t.Fatalf("expected a note that filters don't apply in tree view, got:\n%s", html)
+	}
+}
+
+func TestVaultDetailViewToggleOffersTilesListAndTree(t *testing.T) {
+	t.Parallel()
+
+	html := renderVaultDetail(t, vaultTemplateDataWithView(vaultViewTiles, application.CompendiumFilters{}))
+
+	for _, view := range []string{"tiles", "list", "tree"} {
+		if !strings.Contains(html, `name="view" value="`+view+`"`) {
+			t.Fatalf("expected a %s-view submit button, got:\n%s", view, html)
+		}
+	}
+}
+
+func TestVaultDetailFilterBarSubmitsToTheVaultURL(t *testing.T) {
+	t.Parallel()
+
+	html := renderVaultDetail(t, vaultTemplateDataWithView(vaultViewTiles, application.CompendiumFilters{}))
+
+	if !strings.Contains(html, `action="/vaults/vault-1"`) {
+		t.Fatalf("expected the filter bar to submit to the vault's own URL, got:\n%s", html)
+	}
+}
+
+func TestVaultDetailShowsMatchCounts(t *testing.T) {
+	t.Parallel()
+
+	html := renderVaultDetail(t, vaultTemplateDataWithView(vaultViewTiles, application.CompendiumFilters{}))
+
+	if !strings.Contains(html, "1 of 1") {
+		t.Fatalf("expected the matched/total item counts to be shown, got:\n%s", html)
+	}
+}
+
+func TestVaultDetailEmptyResultExplainsTheFilter(t *testing.T) {
+	t.Parallel()
+
+	data := vaultTemplateDataWithView(vaultViewTiles, application.CompendiumFilters{Category: "armor"})
+	data.VaultBrowse.Entries = nil
+	data.VaultBrowse.MatchCount = 0
+
+	html := renderVaultDetail(t, data)
+	if !strings.Contains(html, "No items match") {
+		t.Fatalf("expected an empty-result message, got:\n%s", html)
 	}
 }

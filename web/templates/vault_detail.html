@@ -20,10 +20,26 @@
 
 <section class="mb-5 rounded-xl border border-edge bg-panel p-5">
   <h2 class="mt-0">Inventory</h2>
-  {{if .VaultDetail.RootItems}}
-    {{template "item_nodes" .VaultDetail.RootItems}}
+  <p class="text-muted">Showing {{.FilterBar.MatchCount}} of {{.FilterBar.TotalCount}} items.</p>
+  {{template "item_filter_bar" .FilterBar}}
+</section>
+
+<section class="mb-5 rounded-xl border border-edge bg-panel p-5">
+  {{if eq .VaultView "tree"}}
+    <p class="mb-4 text-muted">Filters apply to the tiles and list views. This tree shows every item, unfiltered.</p>
+    {{if .VaultDetail.RootItems}}
+      {{template "item_nodes" .VaultDetail.RootItems}}
+    {{else}}
+      <p class="text-muted">This vault is empty.</p>
+    {{end}}
+  {{else if .VaultBrowse.Entries}}
+    {{if eq .VaultView "list"}}
+      {{template "item_table" .VaultBrowse.Entries}}
+    {{else}}
+      {{template "item_cards" .VaultBrowse.Entries}}
+    {{end}}
   {{else}}
-    <p class="text-muted">This vault is empty.</p>
+    <p class="text-muted">No items match these filters.</p>
   {{end}}
 </section>
 {{template "page_bottom" .}}

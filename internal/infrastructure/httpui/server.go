@@ -102,6 +102,28 @@ type FilterBarData struct {
 
 var compendiumViews = []string{compendiumViewTiles, compendiumViewList}
 
+const (
+	vaultViewTiles = "tiles"
+	vaultViewList  = "list"
+	vaultViewTree  = "tree"
+)
+
+var vaultViews = []string{vaultViewTiles, vaultViewList, vaultViewTree}
+
+// normalizeVaultView resolves the ?view= parameter for the vault browser,
+// defaulting to tiles. The vault adds a third "tree" mode (the original
+// nested inventory view) alongside the tiles/list pair the compendium uses.
+func normalizeVaultView(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case vaultViewList:
+		return vaultViewList
+	case vaultViewTree:
+		return vaultViewTree
+	default:
+		return vaultViewTiles
+	}
+}
+
 // newFilterBar builds the shared filter bar view model. ResetURL is always the
 // bare action URL: resetting means dropping every query parameter, which is
 // exactly what an unqualified GET to the action does.
@@ -383,11 +405,34 @@ func (s *Server) handleVaultDetail(w http.ResponseWriter, r *http.Request, id st
 		return
 	}
 
+	filters := parseCompendiumFilters(r)
+	view := normalizeVaultView(r.URL.Query().Get("view"))
+	action := "/vaults/" + id
+
+	browse, err := s.service.BrowseVault(r.Context(), id, filters)
+	if err != nil {
+		// A malformed filter value is user error, not a server fault: re-render
+		// the browser with the message so the DM can correct the field, mirroring
+		// handleCompendium's error branch.
+		s.render(w, "vault_detail", http.StatusBadRequest, TemplateData{
+			Title:       data.Summary.Vault.CharacterName,
+			Error:       err.Error(),
+			AppSettings: data.Settings,
+			VaultDetail: data,
+			VaultView:   view,
+			FilterBar:   newFilterBar(action, view, vaultViews, filters, application.ItemBrowse{}),
+		})
+		return
+	}
+
 	s.render(w, "vault_detail", http.StatusOK, TemplateData{
 		Title:       data.Summary.Vault.CharacterName,
 		Notice:      r.URL.Query().Get("notice"),
 		AppSettings: data.Settings,
 		VaultDetail: data,
+		VaultBrowse: browse,
+		VaultView:   view,
+		FilterBar:   newFilterBar(action, view, vaultViews, filters, browse),
 	})
 }
 
