@@ -1,60 +1,86 @@
 {{define "item_detail"}}
 {{template "page_top" .}}
-<section class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
-  <article class="mb-5 rounded-xl border border-edge bg-panel p-5">
-    <h1>{{.ItemDetail.Item.Name}}</h1>
-    <p><strong>Category:</strong> {{humanize .ItemDetail.Item.Category}}</p>
-    <p><strong>Rarity:</strong> {{humanize .ItemDetail.Item.Rarity}}</p>
-    <p><strong>Location:</strong> {{.ItemDetail.LocationLabel}}</p>
-    <p><strong>Total weight:</strong> {{weight .ItemDetail.Item.TotalWeightHundredthsLB}} lb</p>
-    <p><strong>Total value:</strong> {{gp .ItemDetail.Item.TotalValueCP}}</p>
-    <p>{{.ItemDetail.Item.Description}}</p>
-    {{with $chips := weaponPropertyChips .ItemDetail.Item.ID .ItemDetail.Item.Details.Weapon}}
-      <p><strong>Weapon properties:</strong></p>
-      {{template "weapon_property_chips" $chips}}
-    {{end}}
-
-    {{if .ItemDetail.Children}}
-      <h2>Container contents</h2>
-      {{template "item_nodes" .ItemDetail.Children}}
-    {{end}}
-
-    <div class="my-4 flex flex-wrap gap-3">
-      <button type="button" data-dialog-open="move-dialog" hidden>Move item…</button>
-      <button type="button" data-dialog-open="copy-dialog" hidden>Copy item…</button>
+<section class="mb-5 rounded-xl border border-edge bg-panel p-5">
+  <div class="mb-4 flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <h1 class="m-0 mb-1.5">{{.ItemDetail.Item.Name}}</h1>
+      <p class="m-0 flex flex-wrap gap-1.5 text-muted">
+        <span>{{humanize .ItemDetail.Item.Category}}</span>
+        <span>&middot;</span>
+        <span class="rarity-text {{rarityClass .ItemDetail.Item.Rarity}} font-semibold">{{humanize .ItemDetail.Item.Rarity}}</span>
+      </p>
     </div>
+    <a href="/items/{{.ItemDetail.Item.ID}}/edit">Edit item</a>
+  </div>
+  <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4 text-sm">
+    <p class="m-0"><strong>Location:</strong> {{.ItemDetail.LocationLabel}}</p>
+    <p class="m-0"><strong>Total weight:</strong> {{weight .ItemDetail.Item.TotalWeightHundredthsLB}} lb</p>
+    <p class="m-0"><strong>Total value:</strong> {{gp .ItemDetail.Item.TotalValueCP}}</p>
+  </div>
+  {{if .ItemDetail.Item.Description}}<p class="mt-4">{{.ItemDetail.Item.Description}}</p>{{end}}
+  {{with $chips := weaponPropertyChips .ItemDetail.Item.ID .ItemDetail.Item.Details.Weapon}}
+    <p class="mt-4 mb-1 font-semibold">Weapon properties</p>
+    {{template "weapon_property_chips" $chips}}
+  {{end}}
+</section>
 
-    <dialog id="move-dialog" aria-labelledby="move-dialog-title" open>
-      <form method="post" action="/items/{{.ItemDetail.Item.ID}}/move" class="flex flex-col gap-3.5">
-        <h2 id="move-dialog-title">Move item</h2>
-        {{template "location_fields" .}}
-        <div class="dialog-actions">
-          <button type="button" class="dialog-cancel" data-dialog-close>Cancel</button>
-          <button type="submit">Move item</button>
-        </div>
-      </form>
-    </dialog>
+{{if .ItemDetail.Children}}
+<section class="mb-5 rounded-xl border border-edge bg-panel p-5">
+  <h2 class="mt-0">Container contents</h2>
+  {{template "item_nodes" .ItemDetail.Children}}
+</section>
+{{end}}
 
-    <dialog id="copy-dialog" aria-labelledby="copy-dialog-title" open>
-      <form method="post" action="/items/{{.ItemDetail.Item.ID}}/copy" class="flex flex-col gap-3.5">
-        <h2 id="copy-dialog-title">Copy item</h2>
-        {{template "location_fields" .}}
-        <div class="dialog-actions">
-          <button type="button" class="dialog-cancel" data-dialog-close>Cancel</button>
-          <button type="submit">Copy item</button>
-        </div>
-      </form>
-    </dialog>
-
+<section class="mb-5 rounded-xl border border-edge bg-panel p-5">
+  <h2 class="mt-0">Actions</h2>
+  <div class="flex flex-wrap gap-3">
+    <button type="button" data-dialog-open="move-dialog" hidden>Move item…</button>
+    <button type="button" data-dialog-open="copy-dialog" hidden>Copy item…</button>
     {{if .ItemDetail.Item.IsStackable}}
-      <h2>Split stack</h2>
-      <form method="post" action="/items/{{.ItemDetail.Item.ID}}/split" class="flex flex-wrap items-end gap-3">
+      <button type="button" data-dialog-open="split-dialog" hidden>Split stack…</button>
+      {{if .ItemDetail.MergeTargets}}<button type="button" data-dialog-open="merge-dialog" hidden>Merge stack…</button>{{end}}
+    {{end}}
+    <button type="button" class="bg-danger text-white" data-dialog-open="delete-dialog" hidden>Delete item…</button>
+  </div>
+
+  <dialog id="move-dialog" aria-labelledby="move-dialog-title" open>
+    <form method="post" action="/items/{{.ItemDetail.Item.ID}}/move" class="flex flex-col gap-3.5">
+      <h2 id="move-dialog-title">Move item</h2>
+      {{template "location_fields" .}}
+      <div class="dialog-actions">
+        <button type="button" class="dialog-cancel" data-dialog-close>Cancel</button>
+        <button type="submit">Move item</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="copy-dialog" aria-labelledby="copy-dialog-title" open>
+    <form method="post" action="/items/{{.ItemDetail.Item.ID}}/copy" class="flex flex-col gap-3.5">
+      <h2 id="copy-dialog-title">Copy item</h2>
+      {{template "location_fields" .}}
+      <div class="dialog-actions">
+        <button type="button" class="dialog-cancel" data-dialog-close>Cancel</button>
+        <button type="submit">Copy item</button>
+      </div>
+    </form>
+  </dialog>
+
+  {{if .ItemDetail.Item.IsStackable}}
+    <dialog id="split-dialog" aria-labelledby="split-dialog-title" open>
+      <form method="post" action="/items/{{.ItemDetail.Item.ID}}/split" class="flex flex-col gap-3.5">
+        <h2 id="split-dialog-title">Split stack</h2>
         <label>Quantity <input type="number" name="quantity" min="1" value="1"></label>
-        <button type="submit">Split</button>
+        <div class="dialog-actions">
+          <button type="button" class="dialog-cancel" data-dialog-close>Cancel</button>
+          <button type="submit">Split</button>
+        </div>
       </form>
-      {{if .ItemDetail.MergeTargets}}
-        <h2>Merge stack</h2>
-        <form method="post" action="/items/{{.ItemDetail.Item.ID}}/merge" class="flex flex-wrap items-end gap-3">
+    </dialog>
+
+    {{if .ItemDetail.MergeTargets}}
+      <dialog id="merge-dialog" aria-labelledby="merge-dialog-title" open>
+        <form method="post" action="/items/{{.ItemDetail.Item.ID}}/merge" class="flex flex-col gap-3.5">
+          <h2 id="merge-dialog-title">Merge stack</h2>
           <label>Target
             <select name="target_item_id">
               {{range .ItemDetail.MergeTargets}}
@@ -62,61 +88,52 @@
               {{end}}
             </select>
           </label>
-          <button type="submit">Merge</button>
+          <div class="dialog-actions">
+            <button type="button" class="dialog-cancel" data-dialog-close>Cancel</button>
+            <button type="submit">Merge</button>
+          </div>
         </form>
-      {{end}}
+      </dialog>
     {{end}}
+  {{end}}
 
-    <div class="my-4 flex flex-wrap gap-3">
-      <button type="button" class="bg-danger text-white" data-dialog-open="delete-dialog" hidden>Delete item…</button>
-    </div>
-
-    <dialog id="delete-dialog" aria-labelledby="delete-dialog-title" open>
-      <form method="post" action="/items/{{.ItemDetail.Item.ID}}/delete" class="flex flex-col gap-3.5">
-        <h2 id="delete-dialog-title">Delete item</h2>
-        <p>This will permanently delete "{{.ItemDetail.Item.Name}}". This cannot be undone.</p>
-        <div class="dialog-actions">
-          <button type="button" class="dialog-cancel" data-dialog-close autofocus>Cancel</button>
-          <button type="submit" class="bg-danger text-white">Delete item</button>
-        </div>
-      </form>
-    </dialog>
-
-    <script>
-    (() => {
-      const dialogs = Array.from(document.querySelectorAll("dialog"));
-      if (!dialogs.length || typeof HTMLDialogElement === "undefined") return;
-
-      // Dialogs ship `open` in markup so the forms still submit without JS. Once
-      // scripting is confirmed, close them and reveal the triggers that drive showModal().
-      dialogs.forEach((dialog) => dialog.open && dialog.close());
-      document.querySelectorAll("[data-dialog-open]").forEach((trigger) => {
-        const dialog = document.getElementById(trigger.dataset.dialogOpen);
-        if (!dialog) return;
-        trigger.hidden = false;
-        trigger.addEventListener("click", () => dialog.showModal());
-        // Programmatic closes do not always return focus, so restore it explicitly.
-        dialog.addEventListener("close", () => trigger.focus());
-      });
-      document.querySelectorAll("[data-dialog-close]").forEach((button) => {
-        button.addEventListener("click", () => button.closest("dialog").close());
-      });
-      // A backdrop click targets the dialog element itself, never its contents.
-      dialogs.forEach((dialog) =>
-        dialog.addEventListener("click", (event) => {
-          if (event.target === dialog) dialog.close();
-        }));
-    })();
-    </script>
-  </article>
-
-  <article class="mb-5 rounded-xl border border-edge bg-panel p-5">
-    <h2>Edit item</h2>
-    <form method="post" action="/items/{{.ItemDetail.Item.ID}}" class="flex flex-col gap-3.5">
-      {{template "item_form_fields" .}}
-      <button type="submit">Save item</button>
+  <dialog id="delete-dialog" aria-labelledby="delete-dialog-title" open>
+    <form method="post" action="/items/{{.ItemDetail.Item.ID}}/delete" class="flex flex-col gap-3.5">
+      <h2 id="delete-dialog-title">Delete item</h2>
+      <p>This will permanently delete "{{.ItemDetail.Item.Name}}". This cannot be undone.</p>
+      <div class="dialog-actions">
+        <button type="button" class="dialog-cancel" data-dialog-close autofocus>Cancel</button>
+        <button type="submit" class="bg-danger text-white">Delete item</button>
+      </div>
     </form>
-  </article>
+  </dialog>
+
+  <script>
+  (() => {
+    const dialogs = Array.from(document.querySelectorAll("dialog"));
+    if (!dialogs.length || typeof HTMLDialogElement === "undefined") return;
+
+    // Dialogs ship `open` in markup so the forms still submit without JS. Once
+    // scripting is confirmed, close them and reveal the triggers that drive showModal().
+    dialogs.forEach((dialog) => dialog.open && dialog.close());
+    document.querySelectorAll("[data-dialog-open]").forEach((trigger) => {
+      const dialog = document.getElementById(trigger.dataset.dialogOpen);
+      if (!dialog) return;
+      trigger.hidden = false;
+      trigger.addEventListener("click", () => dialog.showModal());
+      // Programmatic closes do not always return focus, so restore it explicitly.
+      dialog.addEventListener("close", () => trigger.focus());
+    });
+    document.querySelectorAll("[data-dialog-close]").forEach((button) => {
+      button.addEventListener("click", () => button.closest("dialog").close());
+    });
+    // A backdrop click targets the dialog element itself, never its contents.
+    dialogs.forEach((dialog) =>
+      dialog.addEventListener("click", (event) => {
+        if (event.target === dialog) dialog.close();
+      }));
+  })();
+  </script>
 </section>
 {{template "page_bottom" .}}
 {{end}}
