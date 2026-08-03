@@ -202,4 +202,12 @@
     background: var(--color-panel-2);
     color: var(--color-ink);
   }
+
+  /* The <summary> UA disclosure triangle can't be removed with a Tailwind
+     utility — ::-webkit-details-marker lives outside the cascade utilities
+     reach. list-none on the <summary> removes ::marker in Firefox/standard;
+     this rule covers Chromium and Safari. */
+  summary::-webkit-details-marker {
+    display: none;
+  }
 }

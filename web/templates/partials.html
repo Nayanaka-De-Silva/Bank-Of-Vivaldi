@@ -138,19 +138,76 @@
 </script>
 {{end}}
 
+{{/* Shared summary content for a container node: disclosure caret, linked name,
+     category, and subtree stats. Called from both item_nodes and item_nodes_nested
+     so the two depth-level wrappers don't duplicate this markup. */}}
+{{define "item_node_summary"}}
+<svg class="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+  <path d="M4 2l5 4-5 4V2z"/>
+</svg>
+<a href="/items/{{.Item.ID}}" class="font-medium">{{.Item.Name}}</a>
+<span class="text-muted">{{humanize .Item.Category}}</span>
+<span class="text-xs text-muted">{{len .Children}} items &middot; {{weight .TotalWeightHundredths}} lb &middot; {{gp .TotalValueCP}}</span>
+{{end}}
+
+{{/* Shared compact card row for leaf items (no children). Mirrors item_cards
+     visual language: rarity accent bar, rarity-text label, magical/attunement
+     badges, and weapon property chips. Empty containers fall here too. */}}
+{{define "item_node_leaf"}}
+<div class="rarity-accent {{rarityClass .Item.Rarity}} my-1 flex flex-wrap items-center gap-2 rounded-r-md border border-edge bg-panel-2 px-3 py-2 text-sm"{{if .Item.Description}} title="{{.Item.Description}}"{{end}}>
+  <a href="/items/{{.Item.ID}}" class="font-medium">{{.Item.Name}}</a>
+  <span class="text-muted">{{humanize .Item.Category}}</span>
+  <span class="rarity-text text-xs font-semibold">{{humanize .Item.Rarity}}</span>
+  {{if .Item.IsContainer}}<span class="text-xs italic text-muted">empty</span>{{end}}
+  <span class="ml-auto flex flex-wrap items-center gap-1.5 text-xs text-muted">
+    {{if gt .Item.Quantity 1}}<span>{{.Item.Quantity}}x</span>{{end}}
+    <span>{{weight .TotalWeightHundredths}} lb</span>
+    <span>{{gp .TotalValueCP}}</span>
+    {{if .Item.IsMagical}}<span class="rounded-full border border-edge px-1.5 py-0.5 text-[0.72rem] uppercase tracking-wide">Magical</span>{{end}}
+    {{if .Item.RequiresAttunement}}<span class="rounded-full border border-edge px-1.5 py-0.5 text-[0.72rem] uppercase tracking-wide">Attunement</span>{{end}}
+  </span>
+  {{with weaponPropertyChips .Item.ID .Item.Details.Weapon}}{{template "weapon_property_chips" .}}{{end}}
+</div>
+{{end}}
+
+{{/* Entry point used by vault_detail.html, dashboard.html, and item_detail.html.
+     Top-level containers render open so no information is hidden on first load.
+     Recurses into item_nodes_nested so any container one level deeper starts
+     collapsed. */}}
 {{define "item_nodes"}}
 <ul class="item-tree m-0 list-none pl-4">
   {{range .}}
     <li>
-      <div class="item-row flex flex-wrap gap-3 py-1">
-        <a href="/items/{{.Item.ID}}">{{.Item.Name}}</a>
-        <span class="text-muted">{{humanize .Item.Category}}</span>
-        <span>{{.Item.Quantity}}x</span>
-        <span>{{weight .TotalWeightHundredths}} lb</span>
-        <span>{{gp .TotalValueCP}}</span>
-      </div>
       {{if .Children}}
-        {{template "item_nodes" .Children}}
+        <details class="group" open>
+          <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 py-2">
+            {{template "item_node_summary" .}}
+          </summary>
+          {{template "item_nodes_nested" .Children}}
+        </details>
+      {{else}}
+        {{template "item_node_leaf" .}}
+      {{end}}
+    </li>
+  {{end}}
+</ul>
+{{end}}
+
+{{/* Nested variant: containers start collapsed (no open attribute). Recurses
+     into itself so every level below depth 1 remains closed by default. */}}
+{{define "item_nodes_nested"}}
+<ul class="item-tree m-0 list-none pl-4">
+  {{range .}}
+    <li>
+      {{if .Children}}
+        <details class="group">
+          <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 py-2">
+            {{template "item_node_summary" .}}
+          </summary>
+          {{template "item_nodes_nested" .Children}}
+        </details>
+      {{else}}
+        {{template "item_node_leaf" .}}
       {{end}}
     </li>
   {{end}}
