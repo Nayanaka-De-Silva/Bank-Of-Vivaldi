@@ -3,3 +3,7 @@
 tmp/
 coverage.out
 D&D 5E - Player's Handbook.pdf
+
+# Standalone tailwindcss CLI binary, fetched by `make css` (see Makefile).
+# Never commit it -- only the CSS it generates (web/static/app.css) is checked in.
+bin/

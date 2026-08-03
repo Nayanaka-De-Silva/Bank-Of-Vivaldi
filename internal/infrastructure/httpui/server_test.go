@@ -129,31 +129,10 @@ func TestItemFormFieldsKeepContainerMetadataVisibleForContainerItems(t *testing.
 	}
 }
 
-func TestStylesheetPreservesHiddenAttribute(t *testing.T) {
-	t.Parallel()
-
-	_, currentFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatalf("resolve current file path")
-	}
-
-	stylesheetPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "web", "static", "styles.css")
-	css, err := os.ReadFile(stylesheetPath)
-	if err != nil {
-		t.Fatalf("read stylesheet: %v", err)
-	}
-
-	stylesheet := string(css)
-	if !strings.Contains(stylesheet, "[hidden] {") {
-		t.Fatalf("expected stylesheet to define a hidden attribute rule")
-	}
-	if !strings.Contains(stylesheet, "display: none !important;") {
-		t.Fatalf("expected hidden attribute rule to force display none")
-	}
-}
-
-// readStylesheet loads web/static/styles.css relative to this test file.
-func readStylesheet(t *testing.T) string {
+// readTailwindInput loads web/tailwind/input.css relative to this test file.
+// This is the hand-authored source of truth: stable, developer-written CSS
+// that survives a Tailwind regeneration, unlike the generated output below.
+func readTailwindInput(t *testing.T) string {
 	t.Helper()
 
 	_, currentFile, _, ok := runtime.Caller(0)
@@ -161,84 +140,118 @@ func readStylesheet(t *testing.T) string {
 		t.Fatalf("resolve current file path")
 	}
 
-	stylesheetPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "web", "static", "styles.css")
-	css, err := os.ReadFile(stylesheetPath)
+	inputPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "web", "tailwind", "input.css")
+	css, err := os.ReadFile(inputPath)
 	if err != nil {
-		t.Fatalf("read stylesheet: %v", err)
+		t.Fatalf("read tailwind input: %v", err)
 	}
 	return string(css)
 }
 
-func TestStylesheetClampsCompendiumCardDescription(t *testing.T) {
+// readGeneratedStylesheet loads the committed, generated web/static/app.css
+// relative to this test file.
+func readGeneratedStylesheet(t *testing.T) string {
+	t.Helper()
+
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatalf("resolve current file path")
+	}
+
+	stylesheetPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "web", "static", "app.css")
+	css, err := os.ReadFile(stylesheetPath)
+	if err != nil {
+		t.Fatalf("read generated stylesheet: %v", err)
+	}
+	return string(css)
+}
+
+func TestTailwindInputPreservesHiddenAttribute(t *testing.T) {
 	t.Parallel()
 
-	stylesheet := readStylesheet(t)
-	for _, declaration := range []string{
-		".item-card__desc {",
-		"-webkit-line-clamp: 3;",
-		"-webkit-box-orient: vertical;",
-		"overflow: hidden;",
+	input := readTailwindInput(t)
+	if !strings.Contains(input, "[hidden] {") {
+		t.Fatalf("expected the tailwind input to define a hidden attribute rule")
+	}
+	if !strings.Contains(input, "display: none !important;") {
+		t.Fatalf("expected the hidden attribute rule to force display none")
+	}
+}
+
+func TestTailwindInputKeepsRarityAccentVariables(t *testing.T) {
+	t.Parallel()
+
+	input := readTailwindInput(t)
+	// Every canonical rarity must set --rarity, or a new rarity added to the
+	// domain vocabulary would silently render with no accent colour.
+	for _, rarity := range domain.Rarities() {
+		class := "." + rarityClass(rarity) + " {"
+		if !strings.Contains(input, class) {
+			t.Fatalf("expected the tailwind input to define %q for rarity %q", class, rarity)
+		}
+	}
+	if !strings.Contains(input, ".rarity-accent {") || !strings.Contains(input, "var(--rarity") {
+		t.Fatalf("expected .rarity-accent to read the --rarity custom property, got:\n%s", input)
+	}
+}
+
+func TestTailwindInputKeepsPropChipTooltip(t *testing.T) {
+	t.Parallel()
+
+	input := readTailwindInput(t)
+	for _, fragment := range []string{
+		".prop-chip {",
+		".prop-chip__tip {",
+		"opacity: 0;",
+		".prop-chip:hover .prop-chip__tip,",
+		".prop-chip:focus-within .prop-chip__tip {",
+		"opacity: 1;",
 	} {
-		if !strings.Contains(stylesheet, declaration) {
-			t.Fatalf("expected card descriptions to be clamped via %q", declaration)
+		if !strings.Contains(input, fragment) {
+			t.Fatalf("expected the tailwind input to contain %q, got:\n%s", fragment, input)
 		}
 	}
 }
 
-func TestStylesheetStretchesCompendiumCardLink(t *testing.T) {
+func TestTailwindInputKeepsNonModalDialogFallback(t *testing.T) {
 	t.Parallel()
 
-	stylesheet := readStylesheet(t)
-	for _, declaration := range []string{
-		".item-card__title a::after {",
-		"position: absolute;",
-		"inset: 0;",
+	input := readTailwindInput(t)
+	for _, fragment := range []string{
+		"dialog:not(:modal) {",
+		"position: static;",
 	} {
-		if !strings.Contains(stylesheet, declaration) {
-			t.Fatalf("expected the card title link to be stretched over the tile via %q", declaration)
+		if !strings.Contains(input, fragment) {
+			t.Fatalf("expected the tailwind input to contain %q, got:\n%s", fragment, input)
 		}
-	}
-
-	card := strings.Index(stylesheet, ".item-card {")
-	if card < 0 {
-		t.Fatalf("expected an .item-card rule in the stylesheet")
-	}
-	cardRule := stylesheet[card:]
-	if end := strings.Index(cardRule, "}"); end >= 0 {
-		cardRule = cardRule[:end]
-	}
-	if !strings.Contains(cardRule, "position: relative;") {
-		t.Fatalf("expected .item-card to establish a positioning context, got:\n%s", cardRule)
 	}
 }
 
-func TestStylesheetHoverPreservesRarityAccentBorder(t *testing.T) {
+func TestTailwindInputScansOnlyTheTemplateDirectory(t *testing.T) {
 	t.Parallel()
 
-	stylesheet := readStylesheet(t)
+	input := readTailwindInput(t)
+	if !strings.Contains(input, `@import "tailwindcss" source(none);`) {
+		t.Fatalf("expected automatic content detection to be disabled, got:\n%s", input)
+	}
+	if !strings.Contains(input, `@source "../templates";`) {
+		t.Fatalf("expected an explicit content source rooted at the templates directory, got:\n%s", input)
+	}
+}
 
-	hover := strings.Index(stylesheet, ".item-card:hover {")
-	if hover < 0 {
-		t.Fatalf("expected an .item-card:hover rule in the stylesheet")
-	}
-	hoverRule := stylesheet[hover:]
-	if end := strings.Index(hoverRule, "}"); end >= 0 {
-		hoverRule = hoverRule[:end]
-	}
+// TestGeneratedStylesheetIsCommitted smoke-tests the build artifact without
+// asserting on Tailwind's own output format: a missing, empty, or
+// layer-stripped `make css` run would silently ship a bare page.
+func TestGeneratedStylesheetIsCommitted(t *testing.T) {
+	t.Parallel()
 
-	// The border-color shorthand sets all four sides, including border-left,
-	// which would overwrite the rarity accent carried by .item-card's
-	// border-left. Hover must only touch the non-left sides explicitly.
-	if strings.Contains(hoverRule, "border-color:") {
-		t.Fatalf("expected .item-card:hover to avoid the border-color shorthand so it cannot clobber the rarity accent border-left, got:\n%s", hoverRule)
+	stylesheet := readGeneratedStylesheet(t)
+	if len(stylesheet) < 10000 {
+		t.Fatalf("expected the generated stylesheet to be substantial, got %d bytes", len(stylesheet))
 	}
-	for _, declaration := range []string{
-		"border-top-color: var(--accent);",
-		"border-right-color: var(--accent);",
-		"border-bottom-color: var(--accent);",
-	} {
-		if !strings.Contains(hoverRule, declaration) {
-			t.Fatalf("expected .item-card:hover to set %q, got:\n%s", declaration, hoverRule)
+	for _, fragment := range []string{"--rarity", ".prop-chip__tip", "[hidden]"} {
+		if !strings.Contains(stylesheet, fragment) {
+			t.Fatalf("expected the generated stylesheet to contain %q", fragment)
 		}
 	}
 }
@@ -811,24 +824,6 @@ func TestItemDialogScriptWiresModalBehaviour(t *testing.T) {
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("expected dialog script to contain %q, got:\n%s", want, html)
-		}
-	}
-}
-
-func TestStylesheetStylesActionDialogs(t *testing.T) {
-	t.Parallel()
-
-	stylesheet := readStylesheet(t)
-	for _, declaration := range []string{
-		"dialog {",
-		"dialog::backdrop {",
-		"dialog:not(:modal) {",
-		"position: static;",
-		".dialog-actions {",
-		"background: var(--panel);",
-	} {
-		if !strings.Contains(stylesheet, declaration) {
-			t.Fatalf("expected stylesheet to style action dialogs via %q", declaration)
 		}
 	}
 }
@@ -1487,37 +1482,6 @@ func TestWeaponPropertyChipsRenderOnItemDetail(t *testing.T) {
 	}
 	if !strings.Contains(html, `>Finesse<`) {
 		t.Fatalf("expected Finesse chip on item detail page, got:\n%s", html)
-	}
-}
-
-func TestStylesheetIncludesWeaponPropertyChipAndFormCSS(t *testing.T) {
-	t.Parallel()
-
-	stylesheet := readStylesheet(t)
-
-	for _, fragment := range []string{
-		`.prop-chip__tip {`,
-		`opacity: 0;`,
-		`.prop-chip:focus-within .prop-chip__tip`,
-		`.property-option input[type="checkbox"]`,
-		`width: auto;`,
-	} {
-		if !strings.Contains(stylesheet, fragment) {
-			t.Errorf("expected stylesheet to contain %q", fragment)
-		}
-	}
-
-	// z-index: 1; must appear inside the .prop-chips rule.
-	propChips := strings.Index(stylesheet, ".prop-chips {")
-	if propChips < 0 {
-		t.Fatalf("expected .prop-chips rule in stylesheet")
-	}
-	propChipsRule := stylesheet[propChips:]
-	if end := strings.Index(propChipsRule, "}"); end >= 0 {
-		propChipsRule = propChipsRule[:end]
-	}
-	if !strings.Contains(propChipsRule, "z-index: 1;") {
-		t.Fatalf("expected z-index: 1; inside .prop-chips rule, got:\n%s", propChipsRule)
 	}
 }
 

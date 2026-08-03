@@ -5,33 +5,34 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.Title}} - Bank of Vivaldi</title>
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <a href="/">Bank of Vivaldi</a>
-      <span class="subtitle">DM inventory manager</span>
+  <header class="flex flex-wrap items-center justify-between gap-4 border-b border-edge bg-[#0c1015] px-6 py-4">
+    <div class="flex items-baseline gap-3">
+      <a href="/" class="text-lg font-bold">Bank of Vivaldi</a>
+      <span class="text-muted">DM inventory manager</span>
     </div>
-    <nav class="nav">
+    <nav class="flex flex-wrap gap-4">
       <a href="/vaults">Vaults</a>
       <a href="/compendium">Compendium</a>
       <a href="/items/new">New Item</a>
       <a href="/bulk">Bulk Entry</a>
       <a href="/search">Search</a>
     </nav>
-    <form method="post" action="/settings/encumbrance" class="inline-form">
-      <label for="mode">Ruleset</label>
-      <select id="mode" name="mode">
-        <option value="standard" {{if eq .AppSettings.DefaultEncumbranceMode "standard"}}selected{{end}}>Standard</option>
-        <option value="optional" {{if eq .AppSettings.DefaultEncumbranceMode "optional"}}selected{{end}}>Optional Encumbrance</option>
-      </select>
+    <form method="post" action="/settings/encumbrance" class="flex flex-wrap items-end gap-3">
+      <label for="mode" class="flex flex-col gap-1 text-sm">Ruleset
+        <select id="mode" name="mode">
+          <option value="standard" {{if eq .AppSettings.DefaultEncumbranceMode "standard"}}selected{{end}}>Standard</option>
+          <option value="optional" {{if eq .AppSettings.DefaultEncumbranceMode "optional"}}selected{{end}}>Optional Encumbrance</option>
+        </select>
+      </label>
       <button type="submit">Apply</button>
     </form>
   </header>
-  <main class="container">
-    {{if .Notice}}<p class="notice">{{.Notice}}</p>{{end}}
-    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+  <main class="mx-auto max-w-[1280px] px-6 py-6">
+    {{if .Notice}}<p class="mb-4 rounded-lg border border-success/40 bg-success/[0.14] px-4 py-3.5">{{.Notice}}</p>{{end}}
+    {{if .Error}}<p class="mb-4 rounded-lg border border-danger/40 bg-danger/[0.14] px-4 py-3.5 text-[#ffd7d7]">{{.Error}}</p>{{end}}
 {{end}}
 
 {{define "page_bottom"}}

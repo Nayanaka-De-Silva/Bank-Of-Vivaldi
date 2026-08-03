@@ -1,0 +1,178 @@
+/* Tailwind entry point. Not embedded in the binary -- `make css` compiles this
+   into web/static/app.css, which IS embedded and committed. */
+@import "tailwindcss" source(none);
+/* Every Tailwind class in this codebase is a literal in a Go template, so this
+   is the only content root Tailwind needs to scan. source(none) above disables
+   automatic detection, which would otherwise root at this directory and also
+   scan unrelated repo files (the PHB PDF, screenshots) sitting near web/. */
+@source "../templates";
+
+@theme {
+  --color-bg: #11151a;
+  --color-panel: #1a2129;
+  --color-panel-2: #202a33;
+  --color-ink: #e8eef5;
+  --color-muted: #8fa2b4;
+  --color-accent: #70d6ff;
+  --color-danger: #ff6b6b;
+  --color-success: #63e6be;
+  --color-edge: #304150;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  /* The Go handlers toggle the `hidden` attribute on metadata filter groups.
+     Layered !important beats both the UA sheet and the utilities layer, so a
+     `flex`/`grid` utility on the same element can never win the display fight. */
+  [hidden] {
+    display: none !important;
+  }
+
+  /* Generic element defaults, equivalent to the old hand-written styles.css.
+     Tailwind v4 cascade layers order base < components < utilities, and a
+     later layer always wins over an earlier one regardless of selector
+     specificity or source order. That means any utility class applied
+     directly to an element (e.g. the checkbox partial's `w-4`) structurally
+     cannot lose to these rules -- there is no specificity fight to referee,
+     unlike the old plain-CSS stylesheet where `input { width: 100% }` had to
+     be overridden with a more specific selector. */
+  body {
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: Inter, system-ui, sans-serif;
+  }
+  a {
+    color: var(--color-accent);
+    text-decoration: none;
+  }
+  code {
+    background: var(--color-panel-2);
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.2rem;
+  }
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.95rem;
+  }
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+  }
+  input,
+  textarea,
+  select {
+    width: 100%;
+    background: #0f141a;
+    color: var(--color-ink);
+    border: 1px solid var(--color-edge);
+    border-radius: 0.45rem;
+    padding: 0.65rem 0.75rem;
+  }
+  button {
+    border: 0;
+    border-radius: 0.45rem;
+    background: var(--color-accent);
+    color: #051016;
+    padding: 0.7rem 1rem;
+    cursor: pointer;
+    font-weight: 700;
+  }
+  button[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th,
+  td {
+    padding: 0.7rem;
+    border-bottom: 1px solid var(--color-edge);
+    text-align: left;
+    vertical-align: top;
+  }
+}
+
+@layer components {
+  /* rarity-* class names are built in Go by rarityClass() (server.go), so they
+     are invisible to Tailwind's content scanner. Hand-written @layer components
+     rules are emitted regardless of scanning, so no safelist is required. */
+  .rarity-mundane {
+    --rarity: #8fa2b4;
+  }
+  .rarity-unknown {
+    --rarity: #6b7c8d;
+  }
+  .rarity-common {
+    --rarity: #c7d3de;
+  }
+  .rarity-uncommon {
+    --rarity: #63e6be;
+  }
+  .rarity-rare {
+    --rarity: #70a8ff;
+  }
+  .rarity-very-rare {
+    --rarity: #c084fc;
+  }
+  .rarity-legendary {
+    --rarity: #ffb84d;
+  }
+  .rarity-artifact {
+    --rarity: #ff6b6b;
+  }
+
+  /* Left-edge accent shared by cards and list-view badges. */
+  .rarity-accent {
+    border-left: 4px solid var(--rarity, var(--color-edge));
+  }
+  .rarity-text {
+    color: var(--rarity, currentColor);
+  }
+
+  /* Weapon property chip: CSS-only tooltip on hover and keyboard focus. No
+     utility expresses "reveal a sibling on :hover/:focus-within". */
+  .prop-chip {
+    position: relative;
+  }
+  .prop-chip__tip {
+    position: absolute;
+    bottom: calc(100% + 0.35rem);
+    left: 0;
+    z-index: 5;
+    width: max-content;
+    max-width: 16rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease-in-out;
+  }
+  .prop-chip:hover .prop-chip__tip,
+  .prop-chip:focus-within .prop-chip__tip {
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .prop-chip__tip {
+      transition: none;
+    }
+  }
+
+  /* Action dialogs (move / copy / delete) ship with `open` in markup so the
+     forms still submit without JS. The UA sheet absolutely positions open
+     dialogs, which would rip them out of the panel flow, so the non-modal
+     fallback is pinned back into normal document flow. */
+  dialog:not(:modal) {
+    position: static;
+    width: auto;
+    max-width: none;
+    margin: 1rem 0;
+  }
+}
