@@ -1,8 +1,8 @@
 {{define "item_form"}}
 {{template "page_top" .}}
-<section class="panel">
+<section class="mb-5 rounded-xl border border-edge bg-panel p-5">
   <h1>Create item</h1>
-  <form method="post" action="/items" class="stack">
+  <form method="post" action="/items" class="flex flex-col gap-3.5">
     {{template "item_form_fields" .}}
     <button type="submit">Create item</button>
   </form>
@@ -22,7 +22,7 @@
 {{ $hasVisibleMetadata := or $showContainer $showArmor $showWeapon $showTool $showMount $showVehicle $showTreasure }}
 {{ $selectedWeaponClass := "" }}{{ with .Item.Details.Weapon }}{{ $selectedWeaponClass = .WeaponClass }}{{ end }}
 {{ $armorStealthDisadvantage := false }}{{ with .Item.Details.Armor }}{{ $armorStealthDisadvantage = .StealthDisadvantage }}{{ end }}
-<div class="grid two">
+<div class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
   <label>Name <input type="text" name="name" value="{{.Item.Name}}" required></label>
   <label>Category
     <select name="category">
@@ -43,7 +43,7 @@
   <fieldset>
     <legend>Base value</legend>
     {{with breakdownCP .Item.BaseValueCP}}
-    <div class="grid five">
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-4">
       <label>pp <input type="number" name="value_pp" value="{{.PP}}" min="0"></label>
       <label>gp <input type="number" name="value_gp" value="{{.GP}}" min="0"></label>
       <label>ep <input type="number" name="value_ep" value="{{.EP}}" min="0"></label>
@@ -64,7 +64,7 @@
 
 <label>Description <textarea name="description" rows="4">{{.Item.Description}}</textarea></label>
 
-<div class="grid three">
+<div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
   {{template "checkbox_field" (checkbox "Is container" "is_container" .Item.IsContainer)}}
   {{template "checkbox_field" (checkbox "Is stackable" "is_stackable" .Item.IsStackable)}}
   {{template "checkbox_field" (checkbox "Is equipped" "is_equipped" .Item.IsEquipped)}}
@@ -75,20 +75,20 @@
 <h2>Location</h2>
 {{template "location_fields" .}}
 
-<section class="stack" data-metadata-section {{if not $hasVisibleMetadata}}hidden{{end}}>
+<section class="flex flex-col gap-3.5" data-metadata-section {{if not $hasVisibleMetadata}}hidden{{end}}>
   <h2>Specialized metadata</h2>
-  <section class="metadata-group stack" data-metadata-group="container" {{if not $showContainer}}hidden{{end}}>
+  <section class="metadata-group flex flex-col gap-3.5 rounded-lg border border-edge bg-panel-2 p-4" data-metadata-group="container" {{if not $showContainer}}hidden{{end}}>
     <h3>Container metadata</h3>
-    <div class="grid two">
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
       <label>Container max weight (lb)
         <input type="text" name="container_max_weight_lb" value="{{with .Item.Details.Container}}{{weight .MaxWeightHundredthsLB}}{{end}}">
       </label>
     </div>
   </section>
 
-  <section class="metadata-group stack" data-metadata-group="armor" {{if not $showArmor}}hidden{{end}}>
+  <section class="metadata-group flex flex-col gap-3.5 rounded-lg border border-edge bg-panel-2 p-4" data-metadata-group="armor" {{if not $showArmor}}hidden{{end}}>
     <h3>Armor metadata</h3>
-    <div class="grid two">
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
       <label>Armor category
         <input type="text" name="armor_category" value="{{with .Item.Details.Armor}}{{.ArmorCategory}}{{end}}">
       </label>
@@ -105,9 +105,9 @@
     </div>
   </section>
 
-  <section class="metadata-group stack" data-metadata-group="weapon" {{if not $showWeapon}}hidden{{end}}>
+  <section class="metadata-group flex flex-col gap-3.5 rounded-lg border border-edge bg-panel-2 p-4" data-metadata-group="weapon" {{if not $showWeapon}}hidden{{end}}>
     <h3>Weapon metadata</h3>
-    <div class="grid two">
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
       <label>Weapon category
         <select name="weapon_class">
           <option value="">--</option>
@@ -123,15 +123,15 @@
         <input type="text" name="weapon_damage_type" value="{{with .Item.Details.Weapon}}{{.DamageType}}{{end}}">
       </label>
     </div>
-    <fieldset class="property-fieldset" data-weapon-properties>
+    <fieldset class="rounded-lg border border-edge p-4" data-weapon-properties>
       <legend>Weapon properties</legend>
-      <div class="property-grid">
+      <div class="grid gap-2 grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
         {{range weaponPropertyChoices .Item.Details.Weapon}}
           {{template "checkbox_field" (weaponPropertyCheckbox .)}}
         {{end}}
       </div>
     </fieldset>
-    <div class="grid two" data-weapon-range-fields>
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4" data-weapon-range-fields>
       <label>Weapon normal range
         <input type="number" name="weapon_normal_range" value="{{with .Item.Details.Weapon}}{{.NormalRange}}{{end}}">
       </label>
@@ -139,16 +139,16 @@
         <input type="number" name="weapon_long_range" value="{{with .Item.Details.Weapon}}{{.LongRange}}{{end}}">
       </label>
     </div>
-    <div class="grid two" data-weapon-versatile-fields>
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4" data-weapon-versatile-fields>
       <label>Versatile damage dice
         <input type="text" name="weapon_versatile_damage_dice" value="{{with .Item.Details.Weapon}}{{.VersatileDamageDice}}{{end}}">
       </label>
     </div>
   </section>
 
-  <section class="metadata-group stack" data-metadata-group="tool" {{if not $showTool}}hidden{{end}}>
+  <section class="metadata-group flex flex-col gap-3.5 rounded-lg border border-edge bg-panel-2 p-4" data-metadata-group="tool" {{if not $showTool}}hidden{{end}}>
     <h3>Tool metadata</h3>
-    <div class="grid two">
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
       <label>Tool category
         <input type="text" name="tool_category" value="{{with .Item.Details.Tool}}{{.ToolCategory}}{{end}}">
       </label>
@@ -158,9 +158,9 @@
     </div>
   </section>
 
-  <section class="metadata-group stack" data-metadata-group="mount" {{if not $showMount}}hidden{{end}}>
+  <section class="metadata-group flex flex-col gap-3.5 rounded-lg border border-edge bg-panel-2 p-4" data-metadata-group="mount" {{if not $showMount}}hidden{{end}}>
     <h3>Mount metadata</h3>
-    <div class="grid two">
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
       <label>Mount type
         <input type="text" name="mount_type" value="{{with .Item.Details.Mount}}{{.MountType}}{{end}}">
       </label>
@@ -173,9 +173,9 @@
     </div>
   </section>
 
-  <section class="metadata-group stack" data-metadata-group="vehicle" {{if not $showVehicle}}hidden{{end}}>
+  <section class="metadata-group flex flex-col gap-3.5 rounded-lg border border-edge bg-panel-2 p-4" data-metadata-group="vehicle" {{if not $showVehicle}}hidden{{end}}>
     <h3>Vehicle metadata</h3>
-    <div class="grid two">
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
       <label>Vehicle type
         <input type="text" name="vehicle_type" value="{{with .Item.Details.Vehicle}}{{.VehicleType}}{{end}}">
       </label>
@@ -188,9 +188,9 @@
     </div>
   </section>
 
-  <section class="metadata-group stack" data-metadata-group="treasure" {{if not $showTreasure}}hidden{{end}}>
+  <section class="metadata-group flex flex-col gap-3.5 rounded-lg border border-edge bg-panel-2 p-4" data-metadata-group="treasure" {{if not $showTreasure}}hidden{{end}}>
     <h3>Treasure metadata</h3>
-    <div class="grid two">
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
       <label>Treasure kind
         <input type="text" name="treasure_kind" value="{{with .Item.Details.Treasure}}{{.TreasureKind}}{{end}}">
       </label>

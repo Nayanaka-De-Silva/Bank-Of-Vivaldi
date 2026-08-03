@@ -165,14 +165,41 @@
     }
   }
 
-  /* Action dialogs (move / copy / delete) ship with `open` in markup so the
-     forms still submit without JS. The UA sheet absolutely positions open
-     dialogs, which would rip them out of the panel flow, so the non-modal
-     fallback is pinned back into normal document flow. */
+  /* Action dialogs (move / copy / delete): identical styling at all three call
+     sites in item_detail.html, so this is a real bare-element component
+     rather than something worth repeating as inline utilities three times.
+     Dialogs ship with `open` in markup so the forms still submit without JS. */
+  dialog {
+    background: var(--color-panel);
+    color: var(--color-ink);
+    border: 1px solid var(--color-edge);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+  }
+  /* The UA sheet absolutely positions open dialogs, which would rip them out
+     of the panel flow, so the non-modal fallback is pinned back into normal
+     document flow. */
   dialog:not(:modal) {
     position: static;
     width: auto;
     max-width: none;
     margin: 1rem 0;
+  }
+  dialog:modal {
+    width: min(32rem, 92vw);
+  }
+  dialog::backdrop {
+    background: rgba(0, 0, 0, 0.6);
+  }
+  .dialog-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+  }
+  /* Cancel is a secondary action, so it drops the accent fill the base button carries. */
+  .dialog-cancel {
+    background: var(--color-panel-2);
+    color: var(--color-ink);
   }
 }

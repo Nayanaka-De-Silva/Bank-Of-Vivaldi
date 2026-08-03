@@ -1,7 +1,7 @@
 {{define "item_detail"}}
 {{template "page_top" .}}
-<section class="grid two">
-  <article class="panel">
+<section class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
+  <article class="mb-5 rounded-xl border border-edge bg-panel p-5">
     <h1>{{.ItemDetail.Item.Name}}</h1>
     <p><strong>Category:</strong> {{humanize .ItemDetail.Item.Category}}</p>
     <p><strong>Rarity:</strong> {{humanize .ItemDetail.Item.Rarity}}</p>
@@ -19,13 +19,13 @@
       {{template "item_nodes" .ItemDetail.Children}}
     {{end}}
 
-    <div class="item-actions">
-      <button type="button" class="dialog-trigger" data-dialog-open="move-dialog" hidden>Move item…</button>
-      <button type="button" class="dialog-trigger" data-dialog-open="copy-dialog" hidden>Copy item…</button>
+    <div class="my-4 flex flex-wrap gap-3">
+      <button type="button" data-dialog-open="move-dialog" hidden>Move item…</button>
+      <button type="button" data-dialog-open="copy-dialog" hidden>Copy item…</button>
     </div>
 
     <dialog id="move-dialog" aria-labelledby="move-dialog-title" open>
-      <form method="post" action="/items/{{.ItemDetail.Item.ID}}/move" class="stack">
+      <form method="post" action="/items/{{.ItemDetail.Item.ID}}/move" class="flex flex-col gap-3.5">
         <h2 id="move-dialog-title">Move item</h2>
         {{template "location_fields" .}}
         <div class="dialog-actions">
@@ -36,7 +36,7 @@
     </dialog>
 
     <dialog id="copy-dialog" aria-labelledby="copy-dialog-title" open>
-      <form method="post" action="/items/{{.ItemDetail.Item.ID}}/copy" class="stack">
+      <form method="post" action="/items/{{.ItemDetail.Item.ID}}/copy" class="flex flex-col gap-3.5">
         <h2 id="copy-dialog-title">Copy item</h2>
         {{template "location_fields" .}}
         <div class="dialog-actions">
@@ -48,13 +48,13 @@
 
     {{if .ItemDetail.Item.IsStackable}}
       <h2>Split stack</h2>
-      <form method="post" action="/items/{{.ItemDetail.Item.ID}}/split" class="inline-form">
+      <form method="post" action="/items/{{.ItemDetail.Item.ID}}/split" class="flex flex-wrap items-end gap-3">
         <label>Quantity <input type="number" name="quantity" min="1" value="1"></label>
         <button type="submit">Split</button>
       </form>
       {{if .ItemDetail.MergeTargets}}
         <h2>Merge stack</h2>
-        <form method="post" action="/items/{{.ItemDetail.Item.ID}}/merge" class="inline-form">
+        <form method="post" action="/items/{{.ItemDetail.Item.ID}}/merge" class="flex flex-wrap items-end gap-3">
           <label>Target
             <select name="target_item_id">
               {{range .ItemDetail.MergeTargets}}
@@ -67,17 +67,17 @@
       {{end}}
     {{end}}
 
-    <div class="item-actions">
-      <button type="button" class="dialog-trigger danger" data-dialog-open="delete-dialog" hidden>Delete item…</button>
+    <div class="my-4 flex flex-wrap gap-3">
+      <button type="button" class="bg-danger text-white" data-dialog-open="delete-dialog" hidden>Delete item…</button>
     </div>
 
     <dialog id="delete-dialog" aria-labelledby="delete-dialog-title" open>
-      <form method="post" action="/items/{{.ItemDetail.Item.ID}}/delete" class="stack">
+      <form method="post" action="/items/{{.ItemDetail.Item.ID}}/delete" class="flex flex-col gap-3.5">
         <h2 id="delete-dialog-title">Delete item</h2>
         <p>This will permanently delete "{{.ItemDetail.Item.Name}}". This cannot be undone.</p>
         <div class="dialog-actions">
           <button type="button" class="dialog-cancel" data-dialog-close autofocus>Cancel</button>
-          <button type="submit" class="danger">Delete item</button>
+          <button type="submit" class="bg-danger text-white">Delete item</button>
         </div>
       </form>
     </dialog>
@@ -110,9 +110,9 @@
     </script>
   </article>
 
-  <article class="panel">
+  <article class="mb-5 rounded-xl border border-edge bg-panel p-5">
     <h2>Edit item</h2>
-    <form method="post" action="/items/{{.ItemDetail.Item.ID}}" class="stack">
+    <form method="post" action="/items/{{.ItemDetail.Item.ID}}" class="flex flex-col gap-3.5">
       {{template "item_form_fields" .}}
       <button type="submit">Save item</button>
     </form>
