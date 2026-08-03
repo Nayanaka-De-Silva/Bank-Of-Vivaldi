@@ -15,7 +15,7 @@
         </select>
       </label>
       <label>Notes <textarea name="notes" rows="4">{{.VaultDetail.Summary.Vault.Notes}}</textarea></label>
-      <label><input type="checkbox" name="archived" {{if .VaultDetail.Summary.Vault.Archived}}checked{{end}}> Archived</label>
+      {{template "checkbox_field" (checkbox "Archived" "archived" .VaultDetail.Summary.Vault.Archived)}}
       <button type="submit">Save vault</button>
     </form>
   </article>

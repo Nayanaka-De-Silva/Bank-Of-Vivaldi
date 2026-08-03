@@ -1129,9 +1129,9 @@ func TestItemFormWeaponPropertiesRendersLegacyUnknownProperty(t *testing.T) {
 	if !strings.Contains(html, `value="glowing" checked`) {
 		t.Fatalf("expected legacy glowing checkbox to be pre-checked, got:\n%s", html)
 	}
-	// Its label must carry the legacy CSS modifier class.
-	if !strings.Contains(html, "property-option--legacy") {
-		t.Fatalf("expected property-option--legacy class for legacy property, got:\n%s", html)
+	// Its label must be flagged legacy so it renders visually distinct.
+	if !strings.Contains(html, "data-legacy") {
+		t.Fatalf("expected a data-legacy marker on the legacy property's checkbox field, got:\n%s", html)
 	}
 }
 

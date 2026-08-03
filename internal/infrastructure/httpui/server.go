@@ -142,6 +142,39 @@ func newFilterBar(action, view string, views []string, filters application.Compe
 	}
 }
 
+// checkboxField is the view model for the checkbox_field partial, which
+// renders every checkbox in the app as inline "Field name: []" (issue #18,
+// comment #345). Value is empty for a simple boolean flag and set for a
+// multi-value group such as weapon_properties; Legacy marks an option that
+// isn't part of the canonical vocabulary (e.g. a free-text weapon property
+// kept from an earlier entry).
+type checkboxField struct {
+	Label, Name, Value, Hint string
+	Checked, Legacy          bool
+}
+
+// checkbox builds a simple boolean checkbox field.
+func checkbox(label, name string, checked bool) checkboxField {
+	return checkboxField{Label: label, Name: name, Checked: checked}
+}
+
+// weaponPropertyCheckbox adapts a resolved weapon property choice into a
+// checkbox field, carrying its value, description-as-hint, and legacy state.
+func weaponPropertyCheckbox(choice domain.WeaponPropertyChoice) checkboxField {
+	hint := choice.Description
+	if hint == "" {
+		hint = "Custom value kept from an earlier entry."
+	}
+	return checkboxField{
+		Label:   choice.Label,
+		Name:    "weapon_properties",
+		Value:   choice.Key,
+		Hint:    hint,
+		Checked: choice.Selected,
+		Legacy:  !choice.Known,
+	}
+}
+
 // weaponPropertyChip is one rendered pill plus the id its tooltip is wired to
 // through aria-describedby.
 type weaponPropertyChip struct{ Label, Description, DescriptionID string }
@@ -200,6 +233,9 @@ func NewServer(service *application.Service) (*Server, error) {
 		"weaponPropertyChips": weaponPropertyChips,
 		// Generates the bulk-import format spec from the live vocabulary.
 		"bulkFormatSpec": domain.BulkFormatSpec,
+		// Build checkbox_field view models (see checkboxField's doc comment).
+		"checkbox":               checkbox,
+		"weaponPropertyCheckbox": weaponPropertyCheckbox,
 	}
 
 	tmpl, err := template.New("pages").Funcs(funcs).ParseFS(webassets.FS, "templates/*.html")

@@ -16,6 +16,7 @@
     --text-base--line-height: calc(1.5 / 1);
     --text-lg: 1.125rem;
     --text-lg--line-height: calc(1.75 / 1.125);
+    --font-weight-medium: 500;
     --font-weight-semibold: 600;
     --font-weight-bold: 700;
     --tracking-wide: 0.025em;
@@ -253,8 +254,20 @@
   .hidden {
     display: none;
   }
+  .inline-flex {
+    display: inline-flex;
+  }
+  .h-4 {
+    height: calc(var(--spacing) * 4);
+  }
+  .w-4 {
+    width: calc(var(--spacing) * 4);
+  }
   .max-w-\[1280px\] {
     max-width: 1280px;
+  }
+  .shrink-0 {
+    flex-shrink: 0;
   }
   .grid-cols-\[repeat\(auto-fill\,minmax\(260px\,1fr\)\)\] {
     grid-template-columns: repeat(auto-fill,minmax(260px,1fr));
@@ -270,6 +283,9 @@
   }
   .flex-col {
     flex-direction: column;
+  }
+  .flex-row {
+    flex-direction: row;
   }
   .flex-wrap {
     flex-wrap: wrap;
@@ -295,6 +311,9 @@
   .gap-1\.5 {
     gap: calc(var(--spacing) * 1.5);
   }
+  .gap-2 {
+    gap: calc(var(--spacing) * 2);
+  }
   .gap-3 {
     gap: calc(var(--spacing) * 3);
   }
@@ -306,6 +325,9 @@
   }
   .overflow-hidden {
     overflow: hidden;
+  }
+  .rounded {
+    border-radius: 0.25rem;
   }
   .rounded-full {
     border-radius: calc(infinity * 1px);
@@ -347,6 +369,9 @@
   }
   .bg-accent {
     background-color: var(--color-accent);
+  }
+  .bg-bg {
+    background-color: var(--color-bg);
   }
   .bg-danger\/\[0\.14\] {
     background-color: color-mix(in srgb, #ff6b6b 14.000000000000002%, transparent);
@@ -426,6 +451,10 @@
     --tw-font-weight: var(--font-weight-bold);
     font-weight: var(--font-weight-bold);
   }
+  .font-medium {
+    --tw-font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-medium);
+  }
   .font-semibold {
     --tw-font-weight: var(--font-weight-semibold);
     font-weight: var(--font-weight-semibold);
@@ -445,6 +474,12 @@
   }
   .uppercase {
     text-transform: uppercase;
+  }
+  .italic {
+    font-style: italic;
+  }
+  .accent-accent {
+    accent-color: var(--color-accent);
   }
   .filter {
     filter: var(--tw-blur,) var(--tw-brightness,) var(--tw-contrast,) var(--tw-grayscale,) var(--tw-hue-rotate,) var(--tw-invert,) var(--tw-saturate,) var(--tw-sepia,) var(--tw-drop-shadow,);

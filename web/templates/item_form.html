@@ -21,6 +21,7 @@
 {{ $showTreasure := itemMetadataVisible $selectedCategory "treasure" }}
 {{ $hasVisibleMetadata := or $showContainer $showArmor $showWeapon $showTool $showMount $showVehicle $showTreasure }}
 {{ $selectedWeaponClass := "" }}{{ with .Item.Details.Weapon }}{{ $selectedWeaponClass = .WeaponClass }}{{ end }}
+{{ $armorStealthDisadvantage := false }}{{ with .Item.Details.Armor }}{{ $armorStealthDisadvantage = .StealthDisadvantage }}{{ end }}
 <div class="grid two">
   <label>Name <input type="text" name="name" value="{{.Item.Name}}" required></label>
   <label>Category
@@ -64,11 +65,11 @@
 <label>Description <textarea name="description" rows="4">{{.Item.Description}}</textarea></label>
 
 <div class="grid three">
-  <label><input type="checkbox" name="is_container" {{if .Item.IsContainer}}checked{{end}}> Is container</label>
-  <label><input type="checkbox" name="is_stackable" {{if .Item.IsStackable}}checked{{end}}> Is stackable</label>
-  <label><input type="checkbox" name="is_equipped" {{if .Item.IsEquipped}}checked{{end}}> Is equipped</label>
-  <label><input type="checkbox" name="is_magical" {{if .Item.IsMagical}}checked{{end}}> Is magical</label>
-  <label><input type="checkbox" name="requires_attunement" {{if .Item.RequiresAttunement}}checked{{end}}> Requires attunement</label>
+  {{template "checkbox_field" (checkbox "Is container" "is_container" .Item.IsContainer)}}
+  {{template "checkbox_field" (checkbox "Is stackable" "is_stackable" .Item.IsStackable)}}
+  {{template "checkbox_field" (checkbox "Is equipped" "is_equipped" .Item.IsEquipped)}}
+  {{template "checkbox_field" (checkbox "Is magical" "is_magical" .Item.IsMagical)}}
+  {{template "checkbox_field" (checkbox "Requires attunement" "requires_attunement" .Item.RequiresAttunement)}}
 </div>
 
 <h2>Location</h2>
@@ -100,7 +101,7 @@
       <label>Armor strength requirement
         <input type="number" name="armor_strength_requirement" value="{{with .Item.Details.Armor}}{{.StrengthRequirement}}{{end}}">
       </label>
-      <label><input type="checkbox" name="armor_stealth_disadvantage" {{with .Item.Details.Armor}}{{if .StealthDisadvantage}}checked{{end}}{{end}}> Armor stealth disadvantage</label>
+      {{template "checkbox_field" (checkbox "Armor stealth disadvantage" "armor_stealth_disadvantage" $armorStealthDisadvantage)}}
     </div>
   </section>
 
@@ -126,11 +127,7 @@
       <legend>Weapon properties</legend>
       <div class="property-grid">
         {{range weaponPropertyChoices .Item.Details.Weapon}}
-          <label class="property-option{{if not .Known}} property-option--legacy{{end}}">
-            <input type="checkbox" name="weapon_properties" value="{{.Key}}"{{if .Selected}} checked{{end}}>
-            <span class="property-option__label">{{.Label}}</span>
-            <span class="property-option__hint">{{if .Description}}{{.Description}}{{else}}Custom value kept from an earlier entry.{{end}}</span>
-          </label>
+          {{template "checkbox_field" (weaponPropertyCheckbox .)}}
         {{end}}
       </div>
     </fieldset>

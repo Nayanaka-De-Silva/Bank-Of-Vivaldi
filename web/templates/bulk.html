@@ -100,10 +100,10 @@
           <option value="imported" {{if eq .BulkSourceKind "imported"}}selected{{end}}>Imported</option>
         </select>
       </label>
-      <label><input type="checkbox" name="is_stackable" {{if .BulkIsStackable}}checked{{end}}> Mark imported rows as stackable</label>
-      <label><input type="checkbox" name="is_magical" {{if .BulkIsMagical}}checked{{end}}> Mark imported rows as magical</label>
-      <label><input type="checkbox" name="requires_attunement" {{if .BulkRequiresAttunement}}checked{{end}}> Mark imported rows as requiring attunement</label>
-      <label><input type="checkbox" name="is_equipped" {{if .BulkIsEquipped}}checked{{end}}> Mark imported rows as equipped</label>
+      {{template "checkbox_field" (checkbox "Mark imported rows as stackable" "is_stackable" .BulkIsStackable)}}
+      {{template "checkbox_field" (checkbox "Mark imported rows as magical" "is_magical" .BulkIsMagical)}}
+      {{template "checkbox_field" (checkbox "Mark imported rows as requiring attunement" "requires_attunement" .BulkRequiresAttunement)}}
+      {{template "checkbox_field" (checkbox "Mark imported rows as equipped" "is_equipped" .BulkIsEquipped)}}
       <button type="submit">Preview import</button>
     </form>
   </article>
