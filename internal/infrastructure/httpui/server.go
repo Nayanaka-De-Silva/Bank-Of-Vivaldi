@@ -659,6 +659,8 @@ func (s *Server) handleItemRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleItemSplit(w, r)
 	case strings.HasSuffix(r.URL.Path, "/merge"):
 		s.handleItemMerge(w, r)
+	case strings.HasSuffix(r.URL.Path, "/edit"):
+		s.handleItemEdit(w, r)
 	default:
 		s.handleItemDetail(w, r)
 	}
@@ -673,13 +675,14 @@ func (s *Server) handleItemDetail(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodPost {
 		input, err := parseItemInput(r, id)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+		if err == nil {
+			_, err = s.service.SaveItem(r.Context(), input)
 		}
-
-		if _, err := s.service.SaveItem(r.Context(), input); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		if err != nil {
+			// Edits live on /items/{id}/edit now, so a rejected save must
+			// re-render that page -- not the read-only detail page, which no
+			// longer has a form on it at all.
+			s.renderItemEditError(w, r, id, err.Error())
 			return
 		}
 		http.Redirect(w, r, "/items/"+id+"?notice=Item+updated", http.StatusSeeOther)
@@ -705,12 +708,73 @@ func (s *Server) handleItemDetail(w http.ResponseWriter, r *http.Request) {
 		Item:                      detail.Item,
 		AllVaults:                 vaults,
 		ContainerOptions:          containers,
+		SelectedLocationKind:      string(detail.Item.Location.Kind),
+		SelectedVaultID:           detail.Item.Location.OwnerVaultID,
+		SelectedParentContainerID: detail.Item.Location.ParentContainerItemID,
+	})
+}
+
+// handleItemEdit renders the item edit form that used to live directly on the
+// detail page (issue #27, the same split #18 did for vaults): edits now sit
+// behind this dedicated page, reached via an "Edit item" button. The form
+// still posts to the unchanged /items/{id} route.
+func (s *Server) handleItemEdit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := pathSegment(strings.TrimSuffix(r.URL.Path, "/edit"), "/items/")
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	detail, err := s.service.GetItemDetail(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	vaults, containers, err := s.loadFormOptions(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	s.render(w, "item_edit", http.StatusOK, itemEditTemplateData(detail, vaults, containers, ""))
+}
+
+// renderItemEditError re-renders the item edit page with a validation error
+// after a rejected save, mirroring handleVaultDetail's equivalent branch.
+func (s *Server) renderItemEditError(w http.ResponseWriter, r *http.Request, id, errText string) {
+	detail, err := s.service.GetItemDetail(r.Context(), id)
+	if err != nil {
+		http.Error(w, errText, http.StatusBadRequest)
+		return
+	}
+	vaults, containers, err := s.loadFormOptions(r)
+	if err != nil {
+		http.Error(w, errText, http.StatusBadRequest)
+		return
+	}
+	s.render(w, "item_edit", http.StatusBadRequest, itemEditTemplateData(detail, vaults, containers, errText))
+}
+
+func itemEditTemplateData(detail application.ItemDetail, vaults []domain.Vault, containers []domain.Item, errText string) TemplateData {
+	return TemplateData{
+		Title:                     "Edit " + detail.Item.Name,
+		Error:                     errText,
+		AppSettings:               detail.Settings,
+		ItemDetail:                detail,
+		Item:                      detail.Item,
+		AllVaults:                 vaults,
+		ContainerOptions:          containers,
 		Categories:                domain.Categories(),
 		Rarities:                  domain.Rarities(),
 		SelectedLocationKind:      string(detail.Item.Location.Kind),
 		SelectedVaultID:           detail.Item.Location.OwnerVaultID,
 		SelectedParentContainerID: detail.Item.Location.ParentContainerItemID,
-	})
+	}
 }
 
 func (s *Server) handleItemDelete(w http.ResponseWriter, r *http.Request) {

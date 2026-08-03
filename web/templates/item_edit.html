@@ -1,0 +1,12 @@
+{{define "item_edit"}}
+{{template "page_top" .}}
+<p><a href="/items/{{.ItemDetail.Item.ID}}">&larr; Back to {{.ItemDetail.Item.Name}}</a></p>
+<section class="mb-5 rounded-xl border border-edge bg-panel p-5">
+  <h1 class="mt-0">Edit item</h1>
+  <form method="post" action="/items/{{.ItemDetail.Item.ID}}" class="flex flex-col gap-3.5">
+    {{template "item_form_fields" .}}
+    <button type="submit">Save item</button>
+  </form>
+</section>
+{{template "page_bottom" .}}
+{{end}}

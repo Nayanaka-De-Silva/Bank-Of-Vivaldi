@@ -785,12 +785,14 @@ func TestItemDetailReusesLocationFieldsInBothDialogs(t *testing.T) {
 	t.Parallel()
 
 	html := renderItemDetailFromItem(t, domain.Item{ID: "item-1", Name: "Rope"})
-	// Edit form + move dialog + copy dialog: proof the picker is a shared
-	// partial rather than pasted markup drifting out of sync. Matching the
-	// opening tag (not the bare attribute) avoids also counting the JS
-	// selector string 'select[name="location_kind"]' in each copy's script.
-	if got := strings.Count(html, `<select name="location_kind">`); got != 3 {
-		t.Fatalf("expected location_kind select to appear 3 times, got %d in:\n%s", got, html)
+	// Move dialog + copy dialog: proof the picker is a shared partial rather
+	// than pasted markup drifting out of sync. The edit form (a third user of
+	// this partial) moved to the dedicated item_edit page in issue #27, so it
+	// no longer counts here. Matching the opening tag (not the bare attribute)
+	// avoids also counting the JS selector string 'select[name="location_kind"]'
+	// in each copy's script.
+	if got := strings.Count(html, `<select name="location_kind">`); got != 2 {
+		t.Fatalf("expected location_kind select to appear 2 times, got %d in:\n%s", got, html)
 	}
 }
 
