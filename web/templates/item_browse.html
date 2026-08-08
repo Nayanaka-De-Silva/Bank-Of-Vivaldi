@@ -1,12 +1,12 @@
 {{/* Shared by the compendium and vault browsers (issue #18): one filter form,
      one card grid, one table, so the two screens stay visually congruent. */}}
 {{define "item_filter_bar"}}
-<form method="get" action="{{.Action}}" class="flex flex-col gap-3.5" data-compendium-filters>
-  {{/* Only the filter fields collapse (issue #30) -- Apply/Reset/view-toggle
-       stay visible below, since they are navigation, not filter criteria, and
-       hiding them behind a minimized panel would bury the view switcher. Named
-       group/panel keeps this panel's own open state from leaking into the
-       item tree's unrelated group-open carets elsewhere on the page. */}}
+{{/* The form carries an id so the view toggle (item_view_toggle, rendered
+     inside the results panel elsewhere on the page -- issue #30) can submit
+     it via the button `form` attribute without needing to live inside it. */}}
+<form id="{{.PanelKey}}-form" method="get" action="{{.Action}}" class="flex flex-col gap-3.5" data-compendium-filters>
+  {{/* Named group/panel keeps this panel's own open state from leaking into
+       the item tree's unrelated disclosure carets elsewhere on the page. */}}
   <details class="group/panel overflow-hidden rounded-lg border border-edge bg-panel-2"{{if .Filters.HasActiveFilters}} open data-panel-lock{{end}} data-panel="{{.PanelKey}}">
     <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-4 py-3 transition-colors hover:bg-panel/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open/panel:border-b group-open/panel:border-edge/70">
       {{template "panel_summary" filterPanel "h2" "Filters" .Filters}}
@@ -184,18 +184,13 @@
       </div>
     </section>
   </section>
-    </div>
-  </details>
 
   <div class="flex flex-wrap items-center gap-4" data-filter-actions>
     <button type="submit" name="view" value="{{.View}}">Apply filters</button>
     <a class="text-muted" href="{{.ResetURL}}">Reset</a>
-    <div class="ml-auto flex overflow-hidden rounded-lg border border-edge" role="group" aria-label="Result layout">
-      {{range .Views}}
-        <button type="submit" name="view" value="{{.}}" class="rounded-none {{if eq $.View .}}bg-accent text-[#051016]{{else}}bg-panel-2 text-muted{{end}} font-semibold" {{if eq $.View .}}aria-pressed="true"{{else}}aria-pressed="false"{{end}}>{{humanize .}}</button>
-      {{end}}
-    </div>
   </div>
+    </div>
+  </details>
 
   <script>
   (() => {
@@ -231,6 +226,19 @@
   })();
   </script>
 </form>
+{{end}}
+
+{{/* The tiles/list/tree switch controls the results section, not the filter
+     fields, so it renders at the top of the results panel (issue #30) rather
+     than alongside Apply/Reset. Each button targets the filter form by id
+     (see item_filter_bar) via the `form` attribute so it still submits every
+     current filter value despite living outside that <form> element. */}}
+{{define "item_view_toggle"}}
+<div class="flex overflow-hidden rounded-lg border border-edge" role="group" aria-label="Result layout">
+  {{range .Views}}
+    <button type="submit" form="{{$.PanelKey}}-form" name="view" value="{{.}}" class="rounded-none {{if eq $.View .}}bg-accent text-[#051016]{{else}}bg-panel-2 text-muted{{end}} font-semibold" {{if eq $.View .}}aria-pressed="true"{{else}}aria-pressed="false"{{end}}>{{humanize .}}</button>
+  {{end}}
+</div>
 {{end}}
 
 {{define "tristate_options"}}

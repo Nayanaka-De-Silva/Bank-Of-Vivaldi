@@ -121,36 +121,99 @@ func TestItemDetailKeepsDialogsOutsideTheCollapsiblePanel(t *testing.T) {
 	}
 }
 
-func TestFilterActionsStayVisibleOutsideTheCollapsedFilterPanel(t *testing.T) {
+// detailsBodyRange returns the byte range of a data-panel="key" details
+// element's body, i.e. everything between its own opening tag's ">" and its
+// own matching "</details>". Both helpers below use this to prove an element
+// is (or isn't) nested inside a specific panel, not just that both substrings
+// appear somewhere in the page.
+func detailsBodyRange(t *testing.T, html, panelKey string) (start, end int) {
+	t.Helper()
+
+	tag := panelTag(t, html, panelKey)
+	tagIndex := strings.Index(html, tag)
+	if tagIndex < 0 {
+		t.Fatalf("expected to relocate the %q panel tag, got:\n%s", panelKey, html)
+	}
+	start = tagIndex + len(tag)
+	closeOffset := strings.Index(html[start:], "</details>")
+	if closeOffset < 0 {
+		t.Fatalf("expected the %q panel to close, got:\n%s", panelKey, html)
+	}
+	return start, start + closeOffset
+}
+
+func TestFilterActionsSitInsideTheFilterPanelTheyControl(t *testing.T) {
 	t.Parallel()
 
-	// Apply/Reset/view-toggle are navigation, not filter criteria: they must
-	// never be buried behind a minimized "Filters" panel (code review, issue #30).
+	// Apply/Reset act on the filter fields, so they belong inside that same
+	// panel -- at the bottom, since the fields they submit sit above them
+	// (user follow-up on issue #30).
 	compendiumHTML := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{}))
 	vaultHTML := renderVaultDetail(t, vaultTemplateDataWithView(vaultViewTiles, application.CompendiumFilters{}))
 
 	panelKeys := map[string]string{"compendium": "compendium-filters", "vault": "vault-filters"}
 	for name, html := range map[string]string{"compendium": compendiumHTML, "vault": vaultHTML} {
-		actionsIndex := strings.Index(html, "data-filter-actions")
+		start, end := detailsBodyRange(t, html, panelKeys[name])
+		actionsIndex := strings.Index(html[start:end], "data-filter-actions")
 		if actionsIndex < 0 {
-			t.Fatalf("%s: expected a filter actions row, got:\n%s", name, html)
+			t.Fatalf("%s: expected the actions row inside the filter panel, got:\n%s", name, html[start:end])
 		}
+		// "At the bottom": nothing meaningful should follow the actions row
+		// before the panel closes -- specifically, the field grid/category
+		// groups must precede it, not the other way round.
+		if !strings.Contains(html[start:start+actionsIndex], `name="q"`) {
+			t.Fatalf("%s: expected the search field to precede the actions row, got:\n%s", name, html[start:end])
+		}
+	}
+}
 
-		marker := `data-panel="` + panelKeys[name] + `"`
-		markerIndex := strings.Index(html, marker)
-		if markerIndex < 0 {
-			t.Fatalf("%s: expected a %s panel, got:\n%s", name, panelKeys[name], html)
+func TestViewToggleSitsAtTopOfTheResultsPanelItControls(t *testing.T) {
+	t.Parallel()
+
+	// The tiles/list/tree switch controls the results section's display, not
+	// the filter criteria, so it belongs at the top of that panel, ahead of
+	// the results it switches between (user follow-up on issue #30).
+	compendiumHTML := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{}))
+	vaultHTML := renderVaultDetail(t, vaultTemplateDataWithView(vaultViewTiles, application.CompendiumFilters{}))
+
+	cases := []struct {
+		name, html, panelKey, resultMarker string
+	}{
+		{"compendium", compendiumHTML, "compendium-results", ">Scale Mail<"},
+		{"vault", vaultHTML, "vault-contents", ">Longsword<"},
+	}
+	for _, testCase := range cases {
+		start, end := detailsBodyRange(t, testCase.html, testCase.panelKey)
+		body := testCase.html[start:end]
+
+		toggleIndex := strings.Index(body, `aria-label="Result layout"`)
+		if toggleIndex < 0 {
+			t.Fatalf("%s: expected the view toggle inside the results panel, got:\n%s", testCase.name, body)
 		}
-		// The filter panel's own </details> must close before the actions row
-		// starts, i.e. the actions row is a sibling that follows it, not content
-		// nested inside it.
-		filterDetailsClose := strings.Index(html[markerIndex:], "</details>")
-		if filterDetailsClose < 0 {
-			t.Fatalf("%s: expected the filter panel to close, got:\n%s", name, html)
+		resultIndex := strings.Index(body, testCase.resultMarker)
+		if resultIndex < 0 {
+			t.Fatalf("%s: expected a result entry, got:\n%s", testCase.name, body)
 		}
-		if markerIndex+filterDetailsClose > actionsIndex {
-			t.Fatalf("%s: expected the actions row to sit after the filter panel closes, got:\n%s", name, html)
+		if toggleIndex > resultIndex {
+			t.Fatalf("%s: expected the view toggle to sit above the results, got:\n%s", testCase.name, body)
 		}
+	}
+}
+
+func TestViewToggleSubmitsTheFilterFormFromOutsideIt(t *testing.T) {
+	t.Parallel()
+
+	// The toggle buttons render inside the results panel, physically outside
+	// the <form> the filter fields live in (see item_filter_bar) -- they must
+	// reference it by id via the `form` attribute or the current filters
+	// wouldn't ride along with the view switch.
+	html := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{Query: "mail"}))
+
+	if !strings.Contains(html, `id="compendium-filters-form"`) {
+		t.Fatalf("expected the filter form to carry a stable id, got:\n%s", html)
+	}
+	if !strings.Contains(html, `form="compendium-filters-form"`) {
+		t.Fatalf("expected the view toggle buttons to target the filter form by id, got:\n%s", html)
 	}
 }
 

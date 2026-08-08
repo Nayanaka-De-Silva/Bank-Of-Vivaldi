@@ -3,9 +3,9 @@
 {{/* Every section is a collapsible panel (issue #30). Panels are named
      group/panel so an open panel's state can't leak into unrelated
      group-open selectors elsewhere on the page (e.g. the item tree's own
-     disclosure carets, see partials.html). The filter fields collapse inside
-     item_filter_bar itself, which keeps Apply/Reset/view-toggle always
-     visible instead of burying them behind a minimized panel. */}}
+     disclosure carets, see partials.html). Apply/Reset live at the bottom of
+     the Filters panel they act on (see item_filter_bar); the view toggle
+     lives at the top of the results panel it controls (item_view_toggle). */}}
 <details class="group/panel mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="compendium-header">
   <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open/panel:border-b group-open/panel:border-edge/70">
     {{template "panel_summary" panel "h1" "Compendium" (printf "Showing %d of %d items" .FilterBar.MatchCount .FilterBar.TotalCount)}}
@@ -28,6 +28,9 @@
     {{template "panel_summary" panel "h2" "Items" (printf "%d shown" .FilterBar.MatchCount)}}
   </summary>
   <div class="px-5 pt-4 pb-5">
+    <div class="mb-4 flex justify-end">
+      {{template "item_view_toggle" .FilterBar}}
+    </div>
     {{if .Compendium.Entries}}
       {{if eq .CompendiumView "list"}}
         {{template "item_table" .Compendium.Entries}}
