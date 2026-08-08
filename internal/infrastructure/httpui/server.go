@@ -98,6 +98,10 @@ type FilterBarData struct {
 	Rarities   []string
 	MatchCount int
 	TotalCount int
+	// PanelKey identifies the filter fields' own collapsible panel (issue #30),
+	// distinct per caller (compendium vs. vault) so localStorage state doesn't
+	// collide between the two browsers.
+	PanelKey string
 }
 
 // panelHeader is the view model for the panel_summary partial: the single
@@ -160,7 +164,7 @@ func normalizeVaultView(value string) string {
 // newFilterBar builds the shared filter bar view model. ResetURL is always the
 // bare action URL: resetting means dropping every query parameter, which is
 // exactly what an unqualified GET to the action does.
-func newFilterBar(action, view string, views []string, filters application.CompendiumFilters, browse application.ItemBrowse) FilterBarData {
+func newFilterBar(action, view string, views []string, filters application.CompendiumFilters, browse application.ItemBrowse, panelKey string) FilterBarData {
 	return FilterBarData{
 		Action:     action,
 		ResetURL:   action,
@@ -172,6 +176,7 @@ func newFilterBar(action, view string, views []string, filters application.Compe
 		Rarities:   domain.Rarities(),
 		MatchCount: browse.MatchCount,
 		TotalCount: browse.TotalCount,
+		PanelKey:   panelKey,
 	}
 }
 
@@ -492,7 +497,7 @@ func (s *Server) handleVaultDetail(w http.ResponseWriter, r *http.Request, id st
 			AppSettings: data.Settings,
 			VaultDetail: data,
 			VaultView:   view,
-			FilterBar:   newFilterBar(action, view, vaultViews, filters, application.ItemBrowse{}),
+			FilterBar:   newFilterBar(action, view, vaultViews, filters, application.ItemBrowse{}, "vault-filters"),
 		})
 		return
 	}
@@ -504,7 +509,7 @@ func (s *Server) handleVaultDetail(w http.ResponseWriter, r *http.Request, id st
 		VaultDetail: data,
 		VaultBrowse: browse,
 		VaultView:   view,
-		FilterBar:   newFilterBar(action, view, vaultViews, filters, browse),
+		FilterBar:   newFilterBar(action, view, vaultViews, filters, browse, "vault-filters"),
 	})
 }
 
@@ -571,7 +576,7 @@ func (s *Server) handleCompendium(w http.ResponseWriter, r *http.Request) {
 			Rarities:          domain.Rarities(),
 			CompendiumFilters: filters,
 			CompendiumView:    view,
-			FilterBar:         newFilterBar("/compendium", view, compendiumViews, filters, application.ItemBrowse{}),
+			FilterBar:         newFilterBar("/compendium", view, compendiumViews, filters, application.ItemBrowse{}, "compendium-filters"),
 		})
 		return
 	}
@@ -585,7 +590,7 @@ func (s *Server) handleCompendium(w http.ResponseWriter, r *http.Request) {
 		Compendium:        browse,
 		CompendiumFilters: filters,
 		CompendiumView:    view,
-		FilterBar:         newFilterBar("/compendium", view, compendiumViews, filters, browse),
+		FilterBar:         newFilterBar("/compendium", view, compendiumViews, filters, browse, "compendium-filters"),
 	})
 }
 

@@ -277,8 +277,9 @@ func TestCompendiumFiltersCountActiveFields(t *testing.T) {
 	}{
 		{"empty", CompendiumFilters{}, 0},
 		{"blank strings are not filters", CompendiumFilters{Query: "   ", Rarity: ""}, 0},
+		// Sort is a display order, not a predicate: it never narrows the result set.
 		{"default sort is not a filter", CompendiumFilters{SortBy: "name"}, 0},
-		{"explicit sort counts", CompendiumFilters{SortBy: "value"}, 1},
+		{"non-default sort is still not a filter", CompendiumFilters{SortBy: "value"}, 0},
 		{"query only", CompendiumFilters{Query: "rope"}, 1},
 		{"base plus category metadata", CompendiumFilters{
 			Query:         "rope",
@@ -287,6 +288,12 @@ func TestCompendiumFiltersCountActiveFields(t *testing.T) {
 		}, 3},
 		{"tri-state any is not a filter", CompendiumFilters{Magical: "any"}, 0},
 		{"tri-state yes counts", CompendiumFilters{Magical: "yes"}, 1},
+		// ArmorStealth renders through the same tristate_options partial as
+		// Magical/Attunement, so it must resolve the same way: only a parsed
+		// yes/no counts, a stray/unrecognized value does not.
+		{"armor stealth tri-state yes counts", CompendiumFilters{ArmorStealth: "yes"}, 1},
+		{"armor stealth tri-state any is not a filter", CompendiumFilters{ArmorStealth: "any"}, 0},
+		{"armor stealth stray value is not a filter", CompendiumFilters{ArmorStealth: "maybe"}, 0},
 	}
 
 	for _, testCase := range cases {

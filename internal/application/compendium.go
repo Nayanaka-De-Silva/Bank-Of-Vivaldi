@@ -64,21 +64,17 @@ func (f CompendiumFilters) ShowsGroup(group string) bool {
 	return active != "" && active == strings.ToLower(strings.TrimSpace(group))
 }
 
-// defaultSortBy is the sort the browsers fall back to, so selecting it is not a
-// narrowing choice and must not read as an active filter.
-const defaultSortBy = "name"
-
 // ActiveFilterCount reports how many filter fields are actually narrowing the
 // result set. The collapsed filter panel (issue #30) shows this count, so a
 // minimized filter never hides the fact that results are being filtered.
-// Tri-state selects only count once resolved to yes/no, and the default sort
-// never counts.
+// Tri-state selects only count once resolved to yes/no. Sort is a display
+// order, not a predicate, so it never counts even when non-default.
 func (f CompendiumFilters) ActiveFilterCount() int {
 	count := 0
 	for _, value := range []string{
 		f.Query, f.Category, f.Rarity,
 		f.MinWeightLB, f.MaxWeightLB, f.MinValueGP, f.MaxValueGP,
-		f.ArmorCategory, f.ArmorDexBehavior, f.ArmorMinAC, f.ArmorMaxAC, f.ArmorStealth,
+		f.ArmorCategory, f.ArmorDexBehavior, f.ArmorMinAC, f.ArmorMaxAC,
 		f.WeaponCategory, f.WeaponDamageType, f.WeaponProperty,
 		f.ContainerMinCapacityLB, f.ContainerMaxCapacityLB,
 		f.ToolCategory,
@@ -90,13 +86,10 @@ func (f CompendiumFilters) ActiveFilterCount() int {
 			count++
 		}
 	}
-	for _, triState := range []string{f.Magical, f.Attunement} {
+	for _, triState := range []string{f.Magical, f.Attunement, f.ArmorStealth} {
 		if parseTriState(triState) != nil {
 			count++
 		}
-	}
-	if sort := strings.ToLower(strings.TrimSpace(f.SortBy)); sort != "" && sort != defaultSortBy {
-		count++
 	}
 	return count
 }

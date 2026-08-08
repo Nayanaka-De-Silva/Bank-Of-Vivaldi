@@ -98,10 +98,16 @@
 {{end}}
 
 {{/* The one disclosure caret in the app: item tree nodes and collapsible page
-     panels (issue #30) both point it. Rotation rides the parent <details
-     class="group">, so any caller must carry that class. */}}
+     panels (issue #30) both point it. Rotation is driven by the hand-written
+     `details[open] > summary > .disclosure-caret` rule in input.css, not a
+     Tailwind group-open: utility -- the utility's descendant selector matches
+     ANY open ancestor sharing the group class, which would leak an outer open
+     container's/panel's state onto an unrelated closed child's caret
+     (recursive tree nesting, or a tree rendered inside an open page panel).
+     The caret must render as a direct child of its <summary> for the child
+     combinator to apply. */}}
 {{define "disclosure_caret"}}
-<svg class="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90 motion-reduce:transition-none" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+<svg class="disclosure-caret h-3 w-3 shrink-0 text-muted transition-transform motion-reduce:transition-none" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
   <path d="M4 2l5 4-5 4V2z"/>
 </svg>
 {{end}}

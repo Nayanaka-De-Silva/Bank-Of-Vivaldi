@@ -1,10 +1,11 @@
 {{define "item_detail"}}
 {{template "page_top" .}}
-{{/* Collapsible panels (issue #30). The action dialogs deliberately sit outside
-     the actions panel: showModal() cannot paint a dialog nested in a closed
-     <details>, which is display:none. */}}
-<details class="group mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="item-summary">
-  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open:border-b group-open:border-edge/70">
+{{/* Collapsible panels (issue #30), see compendium.html for the group/panel
+     naming rationale. The action dialogs deliberately sit outside the actions
+     panel: showModal() cannot paint a dialog nested in a closed <details>,
+     which is display:none. */}}
+<details class="group/panel mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="item-summary">
+  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open/panel:border-b group-open/panel:border-edge/70">
     {{template "panel_summary" panel "h1" .ItemDetail.Item.Name (humanize .ItemDetail.Item.Category)}}
     <span class="rarity-text {{rarityClass .ItemDetail.Item.Rarity}} text-sm font-semibold">{{humanize .ItemDetail.Item.Rarity}}</span>
   </summary>
@@ -26,8 +27,8 @@
 </details>
 
 {{if .ItemDetail.Children}}
-<details class="group mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="item-children">
-  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open:border-b group-open:border-edge/70">
+<details class="group/panel mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="item-children">
+  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open/panel:border-b group-open/panel:border-edge/70">
     {{template "panel_summary" panel "h2" "Container contents" (printf "%d items" (len .ItemDetail.Children))}}
   </summary>
   <div class="px-5 pt-4 pb-5">
@@ -36,8 +37,8 @@
 </details>
 {{end}}
 
-<details class="group mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="item-actions">
-  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open:border-b group-open:border-edge/70">
+<details class="group/panel mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="item-actions">
+  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open/panel:border-b group-open/panel:border-edge/70">
     {{template "panel_summary" panel "h2" "Actions" ""}}
   </summary>
   <div class="flex flex-wrap gap-3 px-5 pt-4 pb-5">

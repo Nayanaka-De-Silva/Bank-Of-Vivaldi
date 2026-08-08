@@ -121,6 +121,90 @@ func TestItemDetailKeepsDialogsOutsideTheCollapsiblePanel(t *testing.T) {
 	}
 }
 
+func TestFilterActionsStayVisibleOutsideTheCollapsedFilterPanel(t *testing.T) {
+	t.Parallel()
+
+	// Apply/Reset/view-toggle are navigation, not filter criteria: they must
+	// never be buried behind a minimized "Filters" panel (code review, issue #30).
+	compendiumHTML := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{}))
+	vaultHTML := renderVaultDetail(t, vaultTemplateDataWithView(vaultViewTiles, application.CompendiumFilters{}))
+
+	panelKeys := map[string]string{"compendium": "compendium-filters", "vault": "vault-filters"}
+	for name, html := range map[string]string{"compendium": compendiumHTML, "vault": vaultHTML} {
+		actionsIndex := strings.Index(html, "data-filter-actions")
+		if actionsIndex < 0 {
+			t.Fatalf("%s: expected a filter actions row, got:\n%s", name, html)
+		}
+
+		marker := `data-panel="` + panelKeys[name] + `"`
+		markerIndex := strings.Index(html, marker)
+		if markerIndex < 0 {
+			t.Fatalf("%s: expected a %s panel, got:\n%s", name, panelKeys[name], html)
+		}
+		// The filter panel's own </details> must close before the actions row
+		// starts, i.e. the actions row is a sibling that follows it, not content
+		// nested inside it.
+		filterDetailsClose := strings.Index(html[markerIndex:], "</details>")
+		if filterDetailsClose < 0 {
+			t.Fatalf("%s: expected the filter panel to close, got:\n%s", name, html)
+		}
+		if markerIndex+filterDetailsClose > actionsIndex {
+			t.Fatalf("%s: expected the actions row to sit after the filter panel closes, got:\n%s", name, html)
+		}
+	}
+}
+
+func TestCompendiumFilterPanelIgnoresSortOnlySelection(t *testing.T) {
+	t.Parallel()
+
+	// A non-default sort narrows nothing, so it must not force the filter
+	// panel open or lock it against the restore script (code review, issue #30).
+	html := renderCompendium(t, compendiumTemplateData(compendiumViewTiles, application.CompendiumFilters{SortBy: "value"}))
+
+	tag := panelTag(t, html, "compendium-filters")
+	if strings.Contains(tag, " open") || strings.Contains(tag, "data-panel-lock") {
+		t.Fatalf("expected a sort-only selection to leave the filter panel closed and unlocked, got:\n%s", tag)
+	}
+	if !strings.Contains(html, "No filters applied") {
+		t.Fatalf("expected the collapsed filter row to say no filters are applied, got:\n%s", html)
+	}
+}
+
+func TestVaultTreeViewDoesNotClaimAFilteredMatchCount(t *testing.T) {
+	t.Parallel()
+
+	// The tree ignores filters entirely, so its own panel header must not read
+	// like the tiles/list "Showing X of Y" count (code review, issue #30).
+	data := vaultTemplateDataWithView(vaultViewTree, application.CompendiumFilters{})
+	data.FilterBar.TotalCount = 40
+	data.FilterBar.MatchCount = 2
+
+	html := renderVaultDetail(t, data)
+	if strings.Contains(html, "Showing 2 of 40") {
+		t.Fatalf("expected the tree view not to report a filtered match count, got:\n%s", html)
+	}
+	if !strings.Contains(html, "40 items, unfiltered") {
+		t.Fatalf("expected the tree view header to report the unfiltered total, got:\n%s", html)
+	}
+}
+
+func TestDisclosureCaretRotatesOnlyForItsOwnDetails(t *testing.T) {
+	t.Parallel()
+
+	// Both the shared item tree caret and the page panel caret must render
+	// through the disclosure-caret CSS hook, not a Tailwind group-open:
+	// utility -- the utility's descendant selector leaks an outer open
+	// ancestor's state onto an unrelated closed child (code review, issue #30).
+	html := renderVaultDetail(t, vaultTemplateDataWithView(vaultViewTiles, application.CompendiumFilters{}))
+
+	if !strings.Contains(html, `class="disclosure-caret`) {
+		t.Fatalf("expected disclosure carets to carry the disclosure-caret CSS hook, got:\n%s", html)
+	}
+	if strings.Contains(html, "group-open:rotate-90") || strings.Contains(html, "group-open/panel:rotate-90") {
+		t.Fatalf("expected no group-open rotate utility on a disclosure caret, got:\n%s", html)
+	}
+}
+
 func TestFilterPanelHeaderReportsActiveFilters(t *testing.T) {
 	t.Parallel()
 

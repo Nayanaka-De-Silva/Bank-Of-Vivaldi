@@ -1,9 +1,11 @@
 {{define "vault_detail"}}
 {{template "page_top" .}}
-{{/* Collapsible panels (issue #30): summary and contents open, filters minimized
-     unless the DM is actually filtering. */}}
-<details class="group mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="vault-summary">
-  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open:border-b group-open:border-edge/70">
+{{/* Collapsible panels (issue #30), see compendium.html for the group/panel
+     naming rationale. The filter fields collapse inside item_filter_bar
+     itself, so Apply/Reset/view-toggle (including the Tree view switch)
+     always stay visible. */}}
+<details class="group/panel mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="vault-summary">
+  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open/panel:border-b group-open/panel:border-edge/70">
     {{template "panel_summary" panel "h1" .VaultDetail.Summary.Vault.CharacterName (printf "%s ruleset" (humanize .VaultDetail.Summary.Vault.EncumbranceMode))}}
   </summary>
   <div class="px-5 pt-4 pb-5">
@@ -21,18 +23,19 @@
   </div>
 </details>
 
-<details class="group mb-5 overflow-hidden rounded-xl border border-edge bg-panel"{{if .FilterBar.Filters.HasActiveFilters}} open data-panel-lock{{end}} data-panel="vault-filters">
-  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open:border-b group-open:border-edge/70">
-    {{template "panel_summary" filterPanel "h2" "Filters" .FilterBar.Filters}}
-  </summary>
-  <div class="px-5 pt-4 pb-5">
-    {{template "item_filter_bar" .FilterBar}}
-  </div>
-</details>
+<div class="mb-5">
+  {{template "item_filter_bar" .FilterBar}}
+</div>
 
-<details class="group mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="vault-contents">
-  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open:border-b group-open:border-edge/70">
-    {{template "panel_summary" panel "h2" "Inventory" (printf "Showing %d of %d items" .FilterBar.MatchCount .FilterBar.TotalCount)}}
+<details class="group/panel mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="vault-contents">
+  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open/panel:border-b group-open/panel:border-edge/70">
+    {{/* The tree view ignores filters entirely (see the note below), so its
+         header must not claim a filtered match count against the total. */}}
+    {{if eq .VaultView "tree"}}
+      {{template "panel_summary" panel "h2" "Inventory" (printf "%d items, unfiltered" .FilterBar.TotalCount)}}
+    {{else}}
+      {{template "panel_summary" panel "h2" "Inventory" (printf "Showing %d of %d items" .FilterBar.MatchCount .FilterBar.TotalCount)}}
+    {{end}}
   </summary>
   <div class="px-5 pt-4 pb-5">
     {{if eq .VaultView "tree"}}

@@ -85,7 +85,7 @@ func vaultTemplateDataWithView(view string, filters application.CompendiumFilter
 		VaultDetail: detail,
 		VaultBrowse: browse,
 		VaultView:   view,
-		FilterBar:   newFilterBar("/vaults/vault-1", view, vaultViews, filters, browse),
+		FilterBar:   newFilterBar("/vaults/vault-1", view, vaultViews, filters, browse, "vault-filters"),
 	}
 }
 

@@ -1,9 +1,13 @@
 {{define "compendium"}}
 {{template "page_top" .}}
-{{/* Every section is a collapsible panel (issue #30): the filter bar starts
-     minimized so the results sit above the fold, the rest start open. */}}
-<details class="group mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="compendium-header">
-  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open:border-b group-open:border-edge/70">
+{{/* Every section is a collapsible panel (issue #30). Panels are named
+     group/panel so an open panel's state can't leak into unrelated
+     group-open selectors elsewhere on the page (e.g. the item tree's own
+     disclosure carets, see partials.html). The filter fields collapse inside
+     item_filter_bar itself, which keeps Apply/Reset/view-toggle always
+     visible instead of burying them behind a minimized panel. */}}
+<details class="group/panel mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="compendium-header">
+  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open/panel:border-b group-open/panel:border-edge/70">
     {{template "panel_summary" panel "h1" "Compendium" (printf "Showing %d of %d items" .FilterBar.MatchCount .FilterBar.TotalCount)}}
   </summary>
   <div class="flex flex-wrap items-center justify-between gap-4 px-5 pt-4 pb-5">
@@ -15,17 +19,12 @@
   </div>
 </details>
 
-<details class="group mb-5 overflow-hidden rounded-xl border border-edge bg-panel"{{if .FilterBar.Filters.HasActiveFilters}} open data-panel-lock{{end}} data-panel="compendium-filters">
-  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open:border-b group-open:border-edge/70">
-    {{template "panel_summary" filterPanel "h2" "Filters" .FilterBar.Filters}}
-  </summary>
-  <div class="px-5 pt-4 pb-5">
-    {{template "item_filter_bar" .FilterBar}}
-  </div>
-</details>
+<div class="mb-5">
+  {{template "item_filter_bar" .FilterBar}}
+</div>
 
-<details class="group mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="compendium-results">
-  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open:border-b group-open:border-edge/70">
+<details class="group/panel mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="compendium-results">
+  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open/panel:border-b group-open/panel:border-edge/70">
     {{template "panel_summary" panel "h2" "Items" (printf "%d shown" .FilterBar.MatchCount)}}
   </summary>
   <div class="px-5 pt-4 pb-5">

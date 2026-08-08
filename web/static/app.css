@@ -191,6 +191,9 @@
   }
 }
 @layer utilities {
+  .collapse {
+    visibility: collapse;
+  }
   .visible {
     visibility: visible;
   }
@@ -495,6 +498,9 @@
   .py-2 {
     padding-block: calc(var(--spacing) * 2);
   }
+  .py-3 {
+    padding-block: calc(var(--spacing) * 3);
+  }
   .py-3\.5 {
     padding-block: calc(var(--spacing) * 3.5);
   }
@@ -642,19 +648,14 @@
     transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
     transition-duration: var(--tw-duration, var(--default-transition-duration));
   }
-  .group-open\:rotate-90 {
-    &:is(:where(.group):is([open], :popover-open, :open) *) {
-      rotate: 90deg;
-    }
-  }
-  .group-open\:border-b {
-    &:is(:where(.group):is([open], :popover-open, :open) *) {
+  .group-open\/panel\:border-b {
+    &:is(:where(.group\/panel):is([open], :popover-open, :open) *) {
       border-bottom-style: var(--tw-border-style);
       border-bottom-width: 1px;
     }
   }
-  .group-open\:border-edge\/70 {
-    &:is(:where(.group):is([open], :popover-open, :open) *) {
+  .group-open\/panel\:border-edge\/70 {
+    &:is(:where(.group\/panel):is([open], :popover-open, :open) *) {
       border-color: color-mix(in srgb, #304150 70%, transparent);
       @supports (color: color-mix(in lab, red, red)) {
         border-color: color-mix(in oklab, var(--color-edge) 70%, transparent);
@@ -735,6 +736,16 @@
         background-color: color-mix(in srgb, #202a33 60%, transparent);
         @supports (color: color-mix(in lab, red, red)) {
           background-color: color-mix(in oklab, var(--color-panel-2) 60%, transparent);
+        }
+      }
+    }
+  }
+  .hover\:bg-panel\/60 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: color-mix(in srgb, #1a2129 60%, transparent);
+        @supports (color: color-mix(in lab, red, red)) {
+          background-color: color-mix(in oklab, var(--color-panel) 60%, transparent);
         }
       }
     }
@@ -914,6 +925,9 @@
   }
   summary::-webkit-details-marker {
     display: none;
+  }
+  details[open] > summary > .disclosure-caret {
+    rotate: 90deg;
   }
 }
 @property --tw-border-style {
