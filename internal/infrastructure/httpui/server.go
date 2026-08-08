@@ -100,6 +100,39 @@ type FilterBarData struct {
 	TotalCount int
 }
 
+// panelHeader is the view model for the panel_summary partial: the single
+// clickable row a collapsed section shrinks to (issue #30). Level keeps the
+// document outline intact ("h1" for a page title, "h2" for a sub-section);
+// Meta is muted supporting text and Badge is an accent chip for state the DM
+// must still see while the panel is minimized.
+type panelHeader struct {
+	Level string
+	Title string
+	Meta  string
+	Badge string
+}
+
+// panel builds a plain section header. Exposed to templates as `panel`.
+func panel(level, title, meta string) panelHeader {
+	return panelHeader{Level: level, Title: title, Meta: meta}
+}
+
+// filterPanel builds the header for a filter section, surfacing how many filters
+// are narrowing the results so a minimized filter bar never hides that state.
+func filterPanel(level, title string, filters application.CompendiumFilters) panelHeader {
+	header := panelHeader{Level: level, Title: title}
+	count := filters.ActiveFilterCount()
+	switch {
+	case count == 0:
+		header.Meta = "No filters applied"
+	case count == 1:
+		header.Badge = "1 filter active"
+	default:
+		header.Badge = fmt.Sprintf("%d filters active", count)
+	}
+	return header
+}
+
 var compendiumViews = []string{compendiumViewTiles, compendiumViewList}
 
 const (
@@ -236,6 +269,9 @@ func NewServer(service *application.Service) (*Server, error) {
 		// Build checkbox_field view models (see checkboxField's doc comment).
 		"checkbox":               checkbox,
 		"weaponPropertyCheckbox": weaponPropertyCheckbox,
+		// Build panel_summary view models for the collapsible sections (issue #30).
+		"panel":       panel,
+		"filterPanel": filterPanel,
 	}
 
 	tmpl, err := template.New("pages").Funcs(funcs).ParseFS(webassets.FS, "templates/*.html")

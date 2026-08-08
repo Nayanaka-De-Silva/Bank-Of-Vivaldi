@@ -1,30 +1,44 @@
 {{define "compendium"}}
 {{template "page_top" .}}
-<section class="mb-5 rounded-xl border border-edge bg-panel p-5">
-  <div class="mb-4 flex flex-wrap items-start justify-between gap-4">
-    <div>
-      <h1 class="m-0 mb-1.5">Compendium</h1>
-      <p class="m-0 text-muted">Prepared DM items, with no strength-based carry cap. Showing {{.FilterBar.MatchCount}} of {{.FilterBar.TotalCount}} items.</p>
-    </div>
-    <div class="flex gap-4">
+{{/* Every section is a collapsible panel (issue #30): the filter bar starts
+     minimized so the results sit above the fold, the rest start open. */}}
+<details class="group mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="compendium-header">
+  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open:border-b group-open:border-edge/70">
+    {{template "panel_summary" panel "h1" "Compendium" (printf "Showing %d of %d items" .FilterBar.MatchCount .FilterBar.TotalCount)}}
+  </summary>
+  <div class="flex flex-wrap items-center justify-between gap-4 px-5 pt-4 pb-5">
+    <p class="m-0 text-muted">Prepared DM items, with no strength-based carry cap.</p>
+    <div class="flex flex-wrap gap-4">
       <a href="/items/new">New item</a>
       <a href="/bulk">Bulk entry</a>
     </div>
   </div>
+</details>
 
-  {{template "item_filter_bar" .FilterBar}}
-</section>
+<details class="group mb-5 overflow-hidden rounded-xl border border-edge bg-panel"{{if .FilterBar.Filters.HasActiveFilters}} open data-panel-lock{{end}} data-panel="compendium-filters">
+  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open:border-b group-open:border-edge/70">
+    {{template "panel_summary" filterPanel "h2" "Filters" .FilterBar.Filters}}
+  </summary>
+  <div class="px-5 pt-4 pb-5">
+    {{template "item_filter_bar" .FilterBar}}
+  </div>
+</details>
 
-<section class="mb-5 rounded-xl border border-edge bg-panel p-5">
-  {{if .Compendium.Entries}}
-    {{if eq .CompendiumView "list"}}
-      {{template "item_table" .Compendium.Entries}}
+<details class="group mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="compendium-results">
+  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open:border-b group-open:border-edge/70">
+    {{template "panel_summary" panel "h2" "Items" (printf "%d shown" .FilterBar.MatchCount)}}
+  </summary>
+  <div class="px-5 pt-4 pb-5">
+    {{if .Compendium.Entries}}
+      {{if eq .CompendiumView "list"}}
+        {{template "item_table" .Compendium.Entries}}
+      {{else}}
+        {{template "item_cards" .Compendium.Entries}}
+      {{end}}
     {{else}}
-      {{template "item_cards" .Compendium.Entries}}
+      <p class="m-0 text-muted">No compendium items match these filters.</p>
     {{end}}
-  {{else}}
-    <p class="text-muted">No compendium items match these filters.</p>
-  {{end}}
-</section>
+  </div>
+</details>
 {{template "page_bottom" .}}
 {{end}}

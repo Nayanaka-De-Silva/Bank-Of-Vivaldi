@@ -48,8 +48,78 @@
 
 {{define "page_bottom"}}
   </main>
+  <script>
+  (() => {
+    // Collapsible page sections (issue #30) remember their open state per key,
+    // so a DM who minimizes the summary panel keeps it minimized while browsing.
+    // Storage is a pure enhancement: the server-rendered defaults are already
+    // correct, so any failure here simply leaves them in place.
+    const storeKey = "bov:panels";
+    const panels = Array.from(document.querySelectorAll("[data-panel]"));
+    if (!panels.length) return;
+
+    const readState = () => {
+      try {
+        return JSON.parse(localStorage.getItem(storeKey)) || {};
+      } catch (error) {
+        return {};
+      }
+    };
+    const writeState = (state) => {
+      try {
+        localStorage.setItem(storeKey, JSON.stringify(state));
+      } catch (error) {
+        // Private mode or a full quota: nothing to recover, defaults still apply.
+      }
+    };
+
+    const stored = readState();
+    panels.forEach((panel) => {
+      // A locked panel was opened deliberately by the server (e.g. filters are
+      // active). It is neither restored nor recorded: a stale "closed" must not
+      // win over it, and browsers fire `toggle` for panels that load open, so
+      // recording it would leak "filters open" onto every later unfiltered page.
+      if ("panelLock" in panel.dataset) return;
+
+      const key = panel.dataset.panel;
+      if (typeof stored[key] === "boolean") {
+        panel.open = stored[key];
+      }
+      panel.addEventListener("toggle", () => {
+        const state = readState();
+        state[key] = panel.open;
+        writeState(state);
+      });
+    });
+  })();
+  </script>
 </body>
 </html>
+{{end}}
+
+{{/* The one disclosure caret in the app: item tree nodes and collapsible page
+     panels (issue #30) both point it. Rotation rides the parent <details
+     class="group">, so any caller must carry that class. */}}
+{{define "disclosure_caret"}}
+<svg class="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90 motion-reduce:transition-none" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+  <path d="M4 2l5 4-5 4V2z"/>
+</svg>
+{{end}}
+
+{{/* The clickable row a collapsed page section shrinks to (issue #30). Takes a
+     panelHeader (see server.go): heading level keeps the document outline
+     intact, Meta is muted supporting text, Badge is an accent chip for state
+     that must stay visible while the panel is minimized. Interactive elements
+     stay out of <summary> -- a nested link both navigates and toggles. */}}
+{{define "panel_summary"}}
+{{template "disclosure_caret"}}
+{{if eq .Level "h1"}}
+  <h1 class="m-0 text-2xl font-semibold tracking-tight">{{.Title}}</h1>
+{{else}}
+  <h2 class="m-0 text-lg font-semibold tracking-tight">{{.Title}}</h2>
+{{end}}
+{{if .Meta}}<span class="text-sm text-muted">{{.Meta}}</span>{{end}}
+{{if .Badge}}<span class="rounded-full border border-edge bg-panel-2 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-accent">{{.Badge}}</span>{{end}}
 {{end}}
 
 {{define "weapon_property_chips"}}
@@ -142,9 +212,7 @@
      category, and subtree stats. Called from both item_nodes and item_nodes_nested
      so the two depth-level wrappers don't duplicate this markup. */}}
 {{define "item_node_summary"}}
-<svg class="h-3 w-3 shrink-0 text-muted transition-transform group-open:rotate-90" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
-  <path d="M4 2l5 4-5 4V2z"/>
-</svg>
+{{template "disclosure_caret"}}
 <a href="/items/{{.Item.ID}}" class="font-medium">{{.Item.Name}}</a>
 <span class="text-muted">{{humanize .Item.Category}}</span>
 <span class="text-xs text-muted">{{len .Children}} items &middot; {{weight .TotalWeightHundredths}} lb &middot; {{gp .TotalValueCP}}</span>
