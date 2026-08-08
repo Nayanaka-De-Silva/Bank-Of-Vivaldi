@@ -930,7 +930,7 @@ func compendiumTemplateData(view string, filters application.CompendiumFilters) 
 		CompendiumView:    view,
 		CompendiumFilters: filters,
 		Compendium:        browse,
-		FilterBar:         newFilterBar("/compendium", view, compendiumViews, filters, browse),
+		FilterBar:         newFilterBar("/compendium", view, compendiumViews, filters, browse, "compendium-filters"),
 	}
 }
 
@@ -957,8 +957,8 @@ func renderPartial(t *testing.T, name string, dot any) string {
 func TestItemFilterBarIsSharedByCompendiumAndVault(t *testing.T) {
 	t.Parallel()
 
-	compendiumBar := newFilterBar("/compendium", compendiumViewTiles, compendiumViews, application.CompendiumFilters{Query: "torch"}, application.ItemBrowse{})
-	vaultBar := newFilterBar("/vaults/vault-1", compendiumViewTiles, compendiumViews, application.CompendiumFilters{Query: "torch"}, application.ItemBrowse{})
+	compendiumBar := newFilterBar("/compendium", compendiumViewTiles, compendiumViews, application.CompendiumFilters{Query: "torch"}, application.ItemBrowse{}, "compendium-filters")
+	vaultBar := newFilterBar("/vaults/vault-1", compendiumViewTiles, compendiumViews, application.CompendiumFilters{Query: "torch"}, application.ItemBrowse{}, "vault-filters")
 
 	compendiumHTML := renderPartial(t, "item_filter_bar", compendiumBar)
 	vaultHTML := renderPartial(t, "item_filter_bar", vaultBar)
@@ -1525,7 +1525,7 @@ func weaponCompendiumTemplateData(view string) TemplateData {
 		CompendiumView:    view,
 		CompendiumFilters: application.CompendiumFilters{},
 		Compendium:        browse,
-		FilterBar:         newFilterBar("/compendium", view, compendiumViews, application.CompendiumFilters{}, browse),
+		FilterBar:         newFilterBar("/compendium", view, compendiumViews, application.CompendiumFilters{}, browse, "compendium-filters"),
 	}
 }
 

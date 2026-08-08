@@ -210,4 +210,18 @@
   summary::-webkit-details-marker {
     display: none;
   }
+
+  /* Rotates a disclosure caret only when its OWN nearest <details> is open.
+     Tailwind's group-open: variant compiles to a descendant selector
+     (`:where(.group):is([open]) *`), which matches every descendant of ANY
+     open ancestor sharing the group class -- with recursively nested item
+     tree containers, or a page panel (issue #30) wrapping the tree, that
+     leaks a grandparent's open state onto an unrelated closed child's caret.
+     The child combinator here is exact: only a <summary> that is the open
+     <details>'s own direct child qualifies, so nesting depth can never bleed
+     through. Every disclosure_caret call site (tree nodes and page panels
+     alike) renders the caret as a direct child of its <summary>. */
+  details[open] > summary > .disclosure-caret {
+    rotate: 90deg;
+  }
 }

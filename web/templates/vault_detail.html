@@ -1,46 +1,63 @@
 {{define "vault_detail"}}
 {{template "page_top" .}}
-<section class="mb-5 rounded-xl border border-edge bg-panel p-5">
-  <div class="mb-4 flex flex-wrap items-start justify-between gap-4">
-    <div>
-      <h1 class="m-0 mb-1.5">{{.VaultDetail.Summary.Vault.CharacterName}}</h1>
-      <p class="m-0 text-muted">{{humanize .VaultDetail.Summary.Vault.EncumbranceMode}} ruleset</p>
+{{/* Collapsible panels (issue #30), see compendium.html for the group/panel
+     naming rationale. Apply/Reset live at the bottom of the Filters panel
+     (item_filter_bar); the tiles/list/tree switch lives at the top of the
+     Inventory panel it controls (item_view_toggle). */}}
+<details class="group/panel mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="vault-summary">
+  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open/panel:border-b group-open/panel:border-edge/70">
+    {{template "panel_summary" panel "h1" .VaultDetail.Summary.Vault.CharacterName (printf "%s ruleset" (humanize .VaultDetail.Summary.Vault.EncumbranceMode))}}
+  </summary>
+  <div class="px-5 pt-4 pb-5">
+    <div class="mb-4 flex flex-wrap gap-4">
+      <a href="/vaults/{{.VaultDetail.Summary.Vault.ID}}/edit">Edit vault</a>
     </div>
-    <a href="/vaults/{{.VaultDetail.Summary.Vault.ID}}/edit">Edit vault</a>
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4 text-sm">
+      <p class="m-0"><strong>Carry:</strong> {{weight .VaultDetail.Summary.TotalCarryWeightHundredths}} / {{weight .VaultDetail.Summary.MaxCarryWeightHundredths}} lb</p>
+      <p class="m-0"><strong>Push / drag / lift:</strong> {{weight .VaultDetail.Summary.PushDragLiftHundredths}} lb</p>
+      <p class="m-0"><strong>State:</strong> {{humanize .VaultDetail.Summary.EncumbranceState}}</p>
+      <p class="m-0"><strong>Items value:</strong> {{gp .VaultDetail.Summary.TotalItemValueCP}}</p>
+      <p class="m-0"><strong>Purse value:</strong> {{gp .VaultDetail.Summary.TotalPurseValueCP}}</p>
+      <p class="m-0"><strong>Purse weight:</strong> {{weight .VaultDetail.Summary.CoinWeightHundredths}} lb</p>
+    </div>
   </div>
-  <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4 text-sm">
-    <p class="m-0"><strong>Carry:</strong> {{weight .VaultDetail.Summary.TotalCarryWeightHundredths}} / {{weight .VaultDetail.Summary.MaxCarryWeightHundredths}} lb</p>
-    <p class="m-0"><strong>Push / drag / lift:</strong> {{weight .VaultDetail.Summary.PushDragLiftHundredths}} lb</p>
-    <p class="m-0"><strong>State:</strong> {{humanize .VaultDetail.Summary.EncumbranceState}}</p>
-    <p class="m-0"><strong>Items value:</strong> {{gp .VaultDetail.Summary.TotalItemValueCP}}</p>
-    <p class="m-0"><strong>Purse value:</strong> {{gp .VaultDetail.Summary.TotalPurseValueCP}}</p>
-    <p class="m-0"><strong>Purse weight:</strong> {{weight .VaultDetail.Summary.CoinWeightHundredths}} lb</p>
-  </div>
-</section>
+</details>
 
-<section class="mb-5 rounded-xl border border-edge bg-panel p-5">
-  <h2 class="mt-0">Inventory</h2>
-  <p class="text-muted">Showing {{.FilterBar.MatchCount}} of {{.FilterBar.TotalCount}} items.</p>
+<div class="mb-5">
   {{template "item_filter_bar" .FilterBar}}
-</section>
+</div>
 
-<section class="mb-5 rounded-xl border border-edge bg-panel p-5">
-  {{if eq .VaultView "tree"}}
-    <p class="mb-4 text-muted">Filters apply to the tiles and list views. This tree shows every item, unfiltered.</p>
-    {{if .VaultDetail.RootItems}}
-      {{template "item_nodes" .VaultDetail.RootItems}}
+<details class="group/panel mb-5 overflow-hidden rounded-xl border border-edge bg-panel" open data-panel="vault-contents">
+  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open/panel:border-b group-open/panel:border-edge/70">
+    {{/* The tree view ignores filters entirely (see the note below), so its
+         header must not claim a filtered match count against the total. */}}
+    {{if eq .VaultView "tree"}}
+      {{template "panel_summary" panel "h2" "Inventory" (printf "%d items, unfiltered" .FilterBar.TotalCount)}}
     {{else}}
-      <p class="text-muted">This vault is empty.</p>
+      {{template "panel_summary" panel "h2" "Inventory" (printf "Showing %d of %d items" .FilterBar.MatchCount .FilterBar.TotalCount)}}
     {{end}}
-  {{else if .VaultBrowse.Entries}}
-    {{if eq .VaultView "list"}}
-      {{template "item_table" .VaultBrowse.Entries}}
+  </summary>
+  <div class="px-5 pt-4 pb-5">
+    <div class="mb-4 flex justify-end">
+      {{template "item_view_toggle" .FilterBar}}
+    </div>
+    {{if eq .VaultView "tree"}}
+      <p class="mt-0 mb-4 text-muted">Filters apply to the tiles and list views. This tree shows every item, unfiltered.</p>
+      {{if .VaultDetail.RootItems}}
+        {{template "item_nodes" .VaultDetail.RootItems}}
+      {{else}}
+        <p class="m-0 text-muted">This vault is empty.</p>
+      {{end}}
+    {{else if .VaultBrowse.Entries}}
+      {{if eq .VaultView "list"}}
+        {{template "item_table" .VaultBrowse.Entries}}
+      {{else}}
+        {{template "item_cards" .VaultBrowse.Entries}}
+      {{end}}
     {{else}}
-      {{template "item_cards" .VaultBrowse.Entries}}
+      <p class="m-0 text-muted">No items match these filters.</p>
     {{end}}
-  {{else}}
-    <p class="text-muted">No items match these filters.</p>
-  {{end}}
-</section>
+  </div>
+</details>
 {{template "page_bottom" .}}
 {{end}}

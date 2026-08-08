@@ -64,6 +64,41 @@ func (f CompendiumFilters) ShowsGroup(group string) bool {
 	return active != "" && active == strings.ToLower(strings.TrimSpace(group))
 }
 
+// ActiveFilterCount reports how many filter fields are actually narrowing the
+// result set. The collapsed filter panel (issue #30) shows this count, so a
+// minimized filter never hides the fact that results are being filtered.
+// Tri-state selects only count once resolved to yes/no. Sort is a display
+// order, not a predicate, so it never counts even when non-default.
+func (f CompendiumFilters) ActiveFilterCount() int {
+	count := 0
+	for _, value := range []string{
+		f.Query, f.Category, f.Rarity,
+		f.MinWeightLB, f.MaxWeightLB, f.MinValueGP, f.MaxValueGP,
+		f.ArmorCategory, f.ArmorDexBehavior, f.ArmorMinAC, f.ArmorMaxAC,
+		f.WeaponCategory, f.WeaponDamageType, f.WeaponProperty,
+		f.ContainerMinCapacityLB, f.ContainerMaxCapacityLB,
+		f.ToolCategory,
+		f.MountType, f.MountMinSpeed, f.MountMaxSpeed,
+		f.VehicleType, f.VehicleMinSpeed, f.VehicleMaxSpeed,
+		f.TreasureKind,
+	} {
+		if strings.TrimSpace(value) != "" {
+			count++
+		}
+	}
+	for _, triState := range []string{f.Magical, f.Attunement, f.ArmorStealth} {
+		if parseTriState(triState) != nil {
+			count++
+		}
+	}
+	return count
+}
+
+// HasActiveFilters reports whether any filter is narrowing the result set.
+func (f CompendiumFilters) HasActiveFilters() bool {
+	return f.ActiveFilterCount() > 0
+}
+
 // Criteria parses the raw form values into a domain predicate, reporting the first
 // malformed numeric input rather than silently ignoring it.
 func (f CompendiumFilters) Criteria() (domain.CompendiumCriteria, error) {

@@ -98,6 +98,43 @@ type FilterBarData struct {
 	Rarities   []string
 	MatchCount int
 	TotalCount int
+	// PanelKey identifies the filter fields' own collapsible panel (issue #30),
+	// distinct per caller (compendium vs. vault) so localStorage state doesn't
+	// collide between the two browsers.
+	PanelKey string
+}
+
+// panelHeader is the view model for the panel_summary partial: the single
+// clickable row a collapsed section shrinks to (issue #30). Level keeps the
+// document outline intact ("h1" for a page title, "h2" for a sub-section);
+// Meta is muted supporting text and Badge is an accent chip for state the DM
+// must still see while the panel is minimized.
+type panelHeader struct {
+	Level string
+	Title string
+	Meta  string
+	Badge string
+}
+
+// panel builds a plain section header. Exposed to templates as `panel`.
+func panel(level, title, meta string) panelHeader {
+	return panelHeader{Level: level, Title: title, Meta: meta}
+}
+
+// filterPanel builds the header for a filter section, surfacing how many filters
+// are narrowing the results so a minimized filter bar never hides that state.
+func filterPanel(level, title string, filters application.CompendiumFilters) panelHeader {
+	header := panelHeader{Level: level, Title: title}
+	count := filters.ActiveFilterCount()
+	switch {
+	case count == 0:
+		header.Meta = "No filters applied"
+	case count == 1:
+		header.Badge = "1 filter active"
+	default:
+		header.Badge = fmt.Sprintf("%d filters active", count)
+	}
+	return header
 }
 
 var compendiumViews = []string{compendiumViewTiles, compendiumViewList}
@@ -127,7 +164,7 @@ func normalizeVaultView(value string) string {
 // newFilterBar builds the shared filter bar view model. ResetURL is always the
 // bare action URL: resetting means dropping every query parameter, which is
 // exactly what an unqualified GET to the action does.
-func newFilterBar(action, view string, views []string, filters application.CompendiumFilters, browse application.ItemBrowse) FilterBarData {
+func newFilterBar(action, view string, views []string, filters application.CompendiumFilters, browse application.ItemBrowse, panelKey string) FilterBarData {
 	return FilterBarData{
 		Action:     action,
 		ResetURL:   action,
@@ -139,6 +176,7 @@ func newFilterBar(action, view string, views []string, filters application.Compe
 		Rarities:   domain.Rarities(),
 		MatchCount: browse.MatchCount,
 		TotalCount: browse.TotalCount,
+		PanelKey:   panelKey,
 	}
 }
 
@@ -236,6 +274,9 @@ func NewServer(service *application.Service) (*Server, error) {
 		// Build checkbox_field view models (see checkboxField's doc comment).
 		"checkbox":               checkbox,
 		"weaponPropertyCheckbox": weaponPropertyCheckbox,
+		// Build panel_summary view models for the collapsible sections (issue #30).
+		"panel":       panel,
+		"filterPanel": filterPanel,
 	}
 
 	tmpl, err := template.New("pages").Funcs(funcs).ParseFS(webassets.FS, "templates/*.html")
@@ -456,7 +497,7 @@ func (s *Server) handleVaultDetail(w http.ResponseWriter, r *http.Request, id st
 			AppSettings: data.Settings,
 			VaultDetail: data,
 			VaultView:   view,
-			FilterBar:   newFilterBar(action, view, vaultViews, filters, application.ItemBrowse{}),
+			FilterBar:   newFilterBar(action, view, vaultViews, filters, application.ItemBrowse{}, "vault-filters"),
 		})
 		return
 	}
@@ -468,7 +509,7 @@ func (s *Server) handleVaultDetail(w http.ResponseWriter, r *http.Request, id st
 		VaultDetail: data,
 		VaultBrowse: browse,
 		VaultView:   view,
-		FilterBar:   newFilterBar(action, view, vaultViews, filters, browse),
+		FilterBar:   newFilterBar(action, view, vaultViews, filters, browse, "vault-filters"),
 	})
 }
 
@@ -535,7 +576,7 @@ func (s *Server) handleCompendium(w http.ResponseWriter, r *http.Request) {
 			Rarities:          domain.Rarities(),
 			CompendiumFilters: filters,
 			CompendiumView:    view,
-			FilterBar:         newFilterBar("/compendium", view, compendiumViews, filters, application.ItemBrowse{}),
+			FilterBar:         newFilterBar("/compendium", view, compendiumViews, filters, application.ItemBrowse{}, "compendium-filters"),
 		})
 		return
 	}
@@ -549,7 +590,7 @@ func (s *Server) handleCompendium(w http.ResponseWriter, r *http.Request) {
 		Compendium:        browse,
 		CompendiumFilters: filters,
 		CompendiumView:    view,
-		FilterBar:         newFilterBar("/compendium", view, compendiumViews, filters, browse),
+		FilterBar:         newFilterBar("/compendium", view, compendiumViews, filters, browse, "compendium-filters"),
 	})
 }
 
