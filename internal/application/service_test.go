@@ -17,9 +17,10 @@ type fakeStore struct {
 	settings        domain.AppSettings
 	vaults          map[string]domain.Vault
 	items           map[string]domain.Item
-	createOrder     []string // IDs in CreateItem call order
-	failCreateAfter int      // if > 0, fail CreateItem after this many successes
-	createCount     int      // number of successful CreateItem calls so far
+	links           map[string][]domain.VaultLink // keyed by vault ID
+	createOrder     []string                      // IDs in CreateItem call order
+	failCreateAfter int                           // if > 0, fail CreateItem after this many successes
+	createCount     int                           // number of successful CreateItem calls so far
 }
 
 func newFakeStore() *fakeStore {
@@ -27,7 +28,33 @@ func newFakeStore() *fakeStore {
 		settings: domain.AppSettings{DefaultEncumbranceMode: domain.EncumbranceModeStandard},
 		vaults:   map[string]domain.Vault{},
 		items:    map[string]domain.Item{},
+		links:    map[string][]domain.VaultLink{},
 	}
+}
+
+func (f *fakeStore) CreateVaultLink(_ context.Context, link domain.VaultLink) (domain.VaultLink, error) {
+	for _, existing := range f.links[link.VaultID] {
+		if existing.ExternalRef == link.ExternalRef {
+			return existing, nil
+		}
+	}
+	f.links[link.VaultID] = append(f.links[link.VaultID], link)
+	return link, nil
+}
+
+func (f *fakeStore) DeleteVaultLink(_ context.Context, vaultID, externalRef string) error {
+	links := f.links[vaultID]
+	for i, existing := range links {
+		if existing.ExternalRef == externalRef {
+			f.links[vaultID] = append(links[:i:i], links[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("vault link %q: %w", externalRef, domain.ErrNotFound)
+}
+
+func (f *fakeStore) ListVaultLinks(_ context.Context, vaultID string) ([]domain.VaultLink, error) {
+	return slices.Clone(f.links[vaultID]), nil
 }
 
 func (f *fakeStore) GetAppSettings(context.Context) (domain.AppSettings, error) {
@@ -52,7 +79,7 @@ func (f *fakeStore) UpdateVault(_ context.Context, vault domain.Vault) (domain.V
 func (f *fakeStore) GetVault(_ context.Context, id string) (domain.Vault, error) {
 	vault, ok := f.vaults[id]
 	if !ok {
-		return domain.Vault{}, fmt.Errorf("vault not found")
+		return domain.Vault{}, fmt.Errorf("vault %q: %w", id, domain.ErrNotFound)
 	}
 	return vault, nil
 }
@@ -93,7 +120,7 @@ func (f *fakeStore) UpdateItem(_ context.Context, item domain.Item) (domain.Item
 func (f *fakeStore) GetItem(_ context.Context, id string) (domain.Item, error) {
 	item, ok := f.items[id]
 	if !ok {
-		return domain.Item{}, fmt.Errorf("item not found")
+		return domain.Item{}, fmt.Errorf("item %q: %w", id, domain.ErrNotFound)
 	}
 	return item, nil
 }
