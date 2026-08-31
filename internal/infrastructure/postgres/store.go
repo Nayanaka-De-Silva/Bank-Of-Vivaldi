@@ -306,6 +306,9 @@ func scanVault(scanner interface{ Scan(dest ...any) error }) (domain.Vault, erro
 		&vault.Purse.GP,
 		&vault.Purse.PP,
 	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Vault{}, fmt.Errorf("vault: %w", domain.ErrNotFound)
+	}
 	if err != nil {
 		return domain.Vault{}, err
 	}
@@ -346,6 +349,9 @@ func scanItem(scanner interface{ Scan(dest ...any) error }) (domain.Item, error)
 		&ownerVaultID,
 		&parentContainerID,
 	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.Item{}, fmt.Errorf("item: %w", domain.ErrNotFound)
+	}
 	if err != nil {
 		return domain.Item{}, err
 	}

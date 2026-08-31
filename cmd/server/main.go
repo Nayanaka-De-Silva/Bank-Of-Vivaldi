@@ -11,6 +11,7 @@ import (
 
 	"bank-of-vivaldi/internal/application"
 	"bank-of-vivaldi/internal/config"
+	"bank-of-vivaldi/internal/infrastructure/httpapi"
 	"bank-of-vivaldi/internal/infrastructure/httpui"
 	"bank-of-vivaldi/internal/infrastructure/postgres"
 )
@@ -39,14 +40,23 @@ func main() {
 	store := postgres.NewStore(db)
 	service := application.NewService(store)
 
-	server, err := httpui.NewServer(service)
+	uiServer, err := httpui.NewServer(service)
 	if err != nil {
 		log.Fatalf("build server: %v", err)
 	}
+	apiServer := httpapi.NewServer(service)
+
+	// The JSON API and the HTML UI share one service and one database; only
+	// the transport layer differs. /api/v1 has no authentication of its own —
+	// see internal/infrastructure/httpapi's package doc and README.md's API
+	// section for why that's a deliberate v1 limitation.
+	root := http.NewServeMux()
+	root.Handle("/api/v1/", http.StripPrefix("/api/v1", apiServer.Routes()))
+	root.Handle("/", uiServer.Routes())
 
 	httpServer := &http.Server{
 		Addr:    cfg.HTTPAddr,
-		Handler: server.Routes(),
+		Handler: root,
 	}
 
 	go func() {

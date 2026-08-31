@@ -40,6 +40,29 @@ docker compose run --rm app go run ./cmd/migrate
 - The local `D&D 5E - Player's Handbook.pdf` file is intentionally ignored and must stay out of version control and remote pushes.
 - If native Go tooling is unavailable in the current shell, use the Compose commands above once Docker is stable again to validate the app from inside the container environment.
 
+## API
+
+Bank of Vivaldi exposes a JSON API under `/api/v1`, alongside the HTML UI. Both surfaces share the same service layer and database — the API is a second transport, not a separate app. See `internal/infrastructure/httpapi` for the implementation.
+
+**v1 has no authentication.** Access control is the Docker network boundary only: the API container must not be published on a port reachable from outside the trusted host network. If another container needs to call it, declare that integration network as `external: true` in `docker-compose.prod.yml` — never wire it up with a manual `docker network connect`, which gets silently dropped on every `--force-recreate` deploy.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/v1/health` | liveness check |
+| `GET` | `/api/v1/vaults` | list vaults, with computed weight/value/encumbrance |
+| `POST` | `/api/v1/vaults` | create a vault |
+| `GET` | `/api/v1/vaults/{id}` | vault detail: summary, item tree, links |
+| `GET` | `/api/v1/vaults/{id}/items` | browse a vault's items (same filters as the compendium) |
+| `POST` | `/api/v1/vaults/{id}/items` | add an item to a vault, inline or transferred from the compendium |
+| `GET` | `/api/v1/vaults/{id}/links` | list external links registered against a vault |
+| `POST` | `/api/v1/vaults/{id}/link` | register an external app's reference against a vault (upsert) |
+| `DELETE` | `/api/v1/vaults/{id}/link` | remove one link — never deletes the vault itself |
+| `GET` | `/api/v1/compendium/items` | browse/filter the compendium |
+
+Vault deletion is intentionally **not** exposed over the API — it stays a deliberate action in the UI.
+
+List endpoints return `{"data": [...], "meta": {"page", "pageSize", "totalItems", "totalPages"}}`; single-resource endpoints return the raw object; errors return `{"error": {"code", "message", "details"?}}` with a matching HTTP status. Weight is in hundredths of a pound and value is in copper pieces, matching the domain's internal units.
+
 ## Bulk item format
 
 One item per line:

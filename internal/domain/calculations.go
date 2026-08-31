@@ -44,7 +44,7 @@ func GetEncumbranceState(totalWeightHundredths int, vault Vault) EncumbranceStat
 
 func ValidateVaultCapacity(vault Vault, totalWeightHundredths int) error {
 	if totalWeightHundredths > vault.CarryCapacityHundredthsLB() {
-		return fmt.Errorf("vault %q would exceed carrying capacity", vault.CharacterName)
+		return fmt.Errorf("vault %q would exceed carrying capacity: %w", vault.CharacterName, ErrConflict)
 	}
 	return nil
 }
@@ -55,7 +55,7 @@ func ValidateContainerCapacity(container Item, containedWeightHundredths int) er
 		return nil
 	}
 	if containedWeightHundredths > maxWeight {
-		return fmt.Errorf("container %q would exceed capacity", container.Name)
+		return fmt.Errorf("container %q would exceed capacity: %w", container.Name, ErrConflict)
 	}
 	return nil
 }

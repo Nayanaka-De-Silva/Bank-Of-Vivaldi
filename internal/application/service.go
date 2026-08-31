@@ -30,6 +30,10 @@ type Store interface {
 	GetItem(ctx context.Context, id string) (domain.Item, error)
 	ListItems(ctx context.Context) ([]domain.Item, error)
 	DeleteItem(ctx context.Context, id string) error
+
+	CreateVaultLink(ctx context.Context, link domain.VaultLink) (domain.VaultLink, error)
+	DeleteVaultLink(ctx context.Context, vaultID, externalRef string) error
+	ListVaultLinks(ctx context.Context, vaultID string) ([]domain.VaultLink, error)
 }
 
 type Service struct {
@@ -484,7 +488,7 @@ func (s *Service) CopyItem(ctx context.Context, itemID string, location domain.I
 
 	src, ok := findItem(allItems, itemID)
 	if !ok {
-		return domain.Item{}, fmt.Errorf("item not found")
+		return domain.Item{}, fmt.Errorf("item %q: %w", itemID, domain.ErrNotFound)
 	}
 
 	now := s.now().UTC()
@@ -1018,23 +1022,23 @@ func (s *Service) resolveLocation(item *domain.Item, allItems []domain.Item) err
 		item.Location.ParentContainerItemID = ""
 	case domain.LocationKindVaultRoot:
 		if item.Location.OwnerVaultID == "" {
-			return fmt.Errorf("vault destination requires a vault")
+			return fmt.Errorf("vault destination requires a vault: %w", domain.ErrInvalidInput)
 		}
 		item.Location.ParentContainerItemID = ""
 	case domain.LocationKindContainer:
 		if item.Location.ParentContainerItemID == "" {
-			return fmt.Errorf("container destination requires a target container")
+			return fmt.Errorf("container destination requires a target container: %w", domain.ErrInvalidInput)
 		}
 		parent, ok := findItem(allItems, item.Location.ParentContainerItemID)
 		if !ok {
-			return fmt.Errorf("target container not found")
+			return fmt.Errorf("target container %q: %w", item.Location.ParentContainerItemID, domain.ErrNotFound)
 		}
 		if !parent.IsContainer {
-			return fmt.Errorf("target item is not a container")
+			return fmt.Errorf("target item %q is not a container: %w", parent.ID, domain.ErrInvalidInput)
 		}
 		item.Location.OwnerVaultID = parent.Location.OwnerVaultID
 	default:
-		return fmt.Errorf("unsupported location kind")
+		return fmt.Errorf("unsupported location kind %q: %w", item.Location.Kind, domain.ErrInvalidInput)
 	}
 
 	return nil
@@ -1141,7 +1145,7 @@ func (s *Service) validateSimulationForItems(ctx context.Context, items []domain
 	for id := range parentIDs {
 		container, ok := byID[id]
 		if !ok {
-			return fmt.Errorf("target container not found")
+			return fmt.Errorf("target container %q: %w", id, domain.ErrNotFound)
 		}
 		if err := domain.ValidateContainerCapacity(container, domain.ComputeContainedWeightHundredths(container.ID, byID, children)); err != nil {
 			return err
