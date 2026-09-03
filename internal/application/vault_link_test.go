@@ -13,6 +13,7 @@ func newVaultForLinking(t *testing.T, svc *Service) domain.Vault {
 	vault, err := svc.CreateVault(context.Background(), CreateVaultInput{
 		CharacterName: "Bruenor",
 		StrengthScore: 16,
+		Kind:          domain.VaultKindPC,
 	})
 	if err != nil {
 		t.Fatalf("create vault: %v", err)

@@ -53,6 +53,7 @@ func vaultTemplateDataWithView(view string, filters application.CompendiumFilter
 		StrengthScore:   16,
 		CarryModifierLB: 0,
 		EncumbranceMode: domain.EncumbranceModeStandard,
+		Kind:            domain.VaultKindPC,
 		Notes:           "Ranger of the North",
 		Purse:           domain.Purse{CP: 1, SP: 2, EP: 0, GP: 30, PP: 1},
 	}
@@ -390,5 +391,89 @@ func TestVaultDetailTreeViewNestedContainerStartsCollapsed(t *testing.T) {
 	// The leaf item must still appear in the output (nested inside collapsed disclosure).
 	if !strings.Contains(html, "Dagger") {
 		t.Fatalf("expected leaf item name to appear in the output, got:\n%s", html)
+	}
+}
+
+func TestVaultDetailShowsKindBadge(t *testing.T) {
+	t.Parallel()
+
+	html := renderVaultDetail(t, vaultTemplateData())
+
+	// vault_detail.html should show the vault kind (PC/NPC).
+	if !strings.Contains(html, "PC") {
+		t.Fatalf("expected the vault kind badge to appear on the detail page, got:\n%s", html)
+	}
+}
+
+func TestVaultEditRendersKindSelect(t *testing.T) {
+	t.Parallel()
+
+	html := renderVaultEdit(t, vaultTemplateData())
+
+	if !strings.Contains(html, `name="kind"`) {
+		t.Fatalf("expected a kind select field in the edit form, got:\n%s", html)
+	}
+	// The current vault's kind should be pre-selected.
+	if !strings.Contains(html, `value="pc" selected`) {
+		t.Fatalf("expected pc to be pre-selected in the kind select, got:\n%s", html)
+	}
+}
+
+func renderVaults(t *testing.T, data TemplateData) string {
+	t.Helper()
+
+	server, err := NewServer(nil)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	var rendered bytes.Buffer
+	if err := server.tmpl.ExecuteTemplate(&rendered, "vaults", data); err != nil {
+		t.Fatalf("render vaults: %v", err)
+	}
+	return rendered.String()
+}
+
+func vaultsListTemplateData() TemplateData {
+	return TemplateData{
+		Title: "Vaults",
+		Vaults: []application.VaultSummary{
+			{
+				Vault: domain.Vault{
+					ID:            "vault-1",
+					CharacterName: "Aragorn",
+					Kind:          domain.VaultKindPC,
+				},
+			},
+		},
+		VaultFilterBar: VaultFilterBarData{
+			Action:   "/vaults",
+			ResetURL: "/vaults",
+			PanelKey: "vault-list-filters",
+		},
+	}
+}
+
+func TestVaultsPageShowsKindBadge(t *testing.T) {
+	t.Parallel()
+
+	html := renderVaults(t, vaultsListTemplateData())
+
+	if !strings.Contains(html, "PC") {
+		t.Fatalf("expected the type badge to appear on the vault card, got:\n%s", html)
+	}
+}
+
+func TestVaultsCreateFormHasKindSelect(t *testing.T) {
+	t.Parallel()
+
+	html := renderVaults(t, vaultsListTemplateData())
+
+	if !strings.Contains(html, `name="kind"`) {
+		t.Fatalf("expected a kind select in the create form, got:\n%s", html)
+	}
+	// The first option should be a blank placeholder.
+	if !strings.Contains(html, "Select type") {
+		t.Fatalf("expected a 'Select type' placeholder option, got:\n%s", html)
 	}
 }

@@ -5,10 +5,15 @@ import (
 	"net/http"
 
 	"bank-of-vivaldi/internal/application"
+	"bank-of-vivaldi/internal/domain"
 )
 
 func (s *Server) handleListVaults(w http.ResponseWriter, r *http.Request) error {
-	summaries, _, err := s.service.ListVaults(r.Context())
+	filters := application.VaultListFilters{
+		Kind:  r.URL.Query().Get("kind"),
+		Query: r.URL.Query().Get("q"),
+	}
+	summaries, _, err := s.service.ListVaults(r.Context(), filters)
 	if err != nil {
 		return err
 	}
@@ -34,11 +39,13 @@ func (s *Server) handleCreateVault(w http.ResponseWriter, r *http.Request) error
 		return validationError(errs)
 	}
 
+	kind, _ := domain.ParseVaultKind(req.Kind) // already validated above
 	vault, err := s.service.CreateVault(r.Context(), application.CreateVaultInput{
 		CharacterName:   req.CharacterName,
 		StrengthScore:   req.StrengthScore,
 		CarryModifierLB: req.CarryModifierLB,
 		Notes:           req.Notes,
+		Kind:            kind,
 	})
 	if err != nil {
 		return err

@@ -8,14 +8,17 @@
 <section class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
   <article class="mb-5 rounded-xl border border-edge bg-panel p-5">
     <h2>Vault summaries</h2>
+    {{template "vault_filter_bar" .VaultFilterBar}}
     {{if .Dashboard.Vaults}}
       <div class="overflow-x-auto">
       <table>
         <thead>
           <tr>
             <th>Vault</th>
+            <th>Type</th>
             <th>Carry</th>
             <th>Capacity</th>
+            <th>Items</th>
             <th>State</th>
             <th>Total Value</th>
           </tr>
@@ -24,8 +27,10 @@
         {{range .Dashboard.Vaults}}
           <tr>
             <td><a href="/vaults/{{.Vault.ID}}">{{.Vault.CharacterName}}</a></td>
+            <td><span class="rounded-full border border-edge px-1.5 py-0.5 text-[0.72rem] uppercase tracking-wide">{{vaultKindLabel .Vault.Kind}}</span></td>
             <td>{{weight .TotalCarryWeightHundredths}} lb</td>
             <td>{{weight .MaxCarryWeightHundredths}} lb</td>
+            <td>{{.ItemCount}}</td>
             <td>{{humanize .EncumbranceState}}</td>
             <td>{{gp .TotalCombinedValueCP}}</td>
           </tr>
@@ -33,6 +38,8 @@
         </tbody>
       </table>
       </div>
+    {{else if .VaultFilterBar.Filters.HasActiveFilters}}
+      <p>No vaults match these filters.</p>
     {{else}}
       <p>No vaults yet.</p>
     {{end}}

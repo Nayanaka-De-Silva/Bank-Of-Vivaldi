@@ -9,11 +9,21 @@
         <label>Character name <input type="text" name="character_name" required></label>
         <label>Strength score <input type="number" name="strength_score" min="1" value="10" required></label>
         <label>Carry modifier (lb) <input type="number" name="carry_modifier_lb" value="0"></label>
+        <label>Type
+          <select name="kind" required>
+            <option value="">Select type&hellip;</option>
+            {{range vaultKinds}}
+              <option value="{{.}}">{{.Label}}</option>
+            {{end}}
+          </select>
+        </label>
         <label>Notes <textarea name="notes" rows="4"></textarea></label>
         <button type="submit">Create vault</button>
       </form>
     </details>
   </div>
+
+  {{template "vault_filter_bar" .VaultFilterBar}}
 
   {{if .Vaults}}
     <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
@@ -21,17 +31,23 @@
         <article class="relative flex flex-col gap-1.5 rounded-lg border border-edge bg-panel-2 p-4{{if .Vault.Archived}} opacity-60{{end}}">
           <h3 class="m-0 text-[1.05rem]"><a href="/vaults/{{.Vault.ID}}" class="after:absolute after:inset-0 after:rounded-[inherit] after:content-['']">{{.Vault.CharacterName}}</a></h3>
           <p class="m-0 flex flex-wrap gap-1.5 text-sm">
+            <span class="rounded-full border border-edge px-1.5 py-0.5 text-[0.72rem] uppercase tracking-wide">{{vaultKindLabel .Vault.Kind}}</span>
+            <span class="text-muted">&middot;</span>
             <span>{{humanize .Vault.EncumbranceMode}}</span>
             <span class="text-muted">&middot;</span>
             <span>{{humanize .EncumbranceState}}</span>
           </p>
           <p class="m-0 flex flex-wrap items-center gap-1.5 text-xs text-muted">
             <span>{{weight .TotalCarryWeightHundredths}} / {{weight .MaxCarryWeightHundredths}} lb</span>
+            <span class="text-muted">&middot;</span>
+            <span>{{.ItemCount}} items</span>
             {{if .Vault.Archived}}<span class="rounded-full border border-edge px-1.5 py-0.5 text-[0.72rem] uppercase tracking-wide">Archived</span>{{end}}
           </p>
         </article>
       {{end}}
     </div>
+  {{else if .VaultFilterBar.Filters.HasActiveFilters}}
+    <p class="text-muted">No vaults match these filters.</p>
   {{else}}
     <p class="text-muted">No vaults have been created yet.</p>
   {{end}}

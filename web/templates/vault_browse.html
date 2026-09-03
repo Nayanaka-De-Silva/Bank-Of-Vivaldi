@@ -1,0 +1,66 @@
+{{/* vault_filter_bar: collapsible vault-list filter panel (mirrors item_filter_bar).
+     Dot is VaultFilterBarData. */}}
+{{define "vault_filter_bar"}}
+<details class="group/panel mb-5 overflow-hidden rounded-xl border border-edge bg-panel"{{if .Filters.HasActiveFilters}} open data-panel-lock{{end}} data-panel="{{.PanelKey}}">
+  <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3 px-5 py-4 transition-colors hover:bg-panel-2/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent group-open/panel:border-b group-open/panel:border-edge/70">
+    {{template "panel_summary" (vaultFilterPanel "h2" "Filter vaults" .Filters)}}
+  </summary>
+  <div class="px-5 pt-4 pb-5">
+    <form method="get" action="{{.Action}}" class="flex flex-col gap-4">
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
+        <label>Name contains
+          <input type="text" name="q" value="{{.Filters.Query}}">
+        </label>
+        <label>Type
+          <select name="kind">
+            <option value="">Any</option>
+            {{range vaultKinds}}
+              <option value="{{.}}" {{if eq (printf "%s" .) $.Filters.Kind}}selected{{end}}>{{.Label}}</option>
+            {{end}}
+          </select>
+        </label>
+        <label>State
+          <select name="state">
+            <option value="">Any</option>
+            {{range encumbranceStates}}
+              <option value="{{.}}" {{if eq . $.Filters.State}}selected{{end}}>{{humanize .}}</option>
+            {{end}}
+          </select>
+        </label>
+        <label>Min carry (lb)
+          <input type="text" name="min_carry_lb" value="{{.Filters.MinCarryLB}}">
+        </label>
+        <label>Max carry (lb)
+          <input type="text" name="max_carry_lb" value="{{.Filters.MaxCarryLB}}">
+        </label>
+        <label>Min capacity (lb)
+          <input type="text" name="min_capacity_lb" value="{{.Filters.MinCapacityLB}}">
+        </label>
+        <label>Max capacity (lb)
+          <input type="text" name="max_capacity_lb" value="{{.Filters.MaxCapacityLB}}">
+        </label>
+        <label>Min items
+          <input type="number" name="min_items" value="{{.Filters.MinItems}}">
+        </label>
+        <label>Max items
+          <input type="number" name="max_items" value="{{.Filters.MaxItems}}">
+        </label>
+        <label>Sort by
+          <select name="sort">
+            <option value="name" {{if eq .Filters.SortBy "name"}}selected{{end}}>Name</option>
+            <option value="type" {{if eq .Filters.SortBy "type"}}selected{{end}}>Type</option>
+            <option value="carry" {{if eq .Filters.SortBy "carry"}}selected{{end}}>Carry weight</option>
+            <option value="capacity" {{if eq .Filters.SortBy "capacity"}}selected{{end}}>Capacity</option>
+            <option value="items" {{if eq .Filters.SortBy "items"}}selected{{end}}>Item count</option>
+            <option value="value" {{if eq .Filters.SortBy "value"}}selected{{end}}>Value</option>
+          </select>
+        </label>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <button type="submit">Apply filters</button>
+        <a href="{{.ResetURL}}">Reset</a>
+      </div>
+    </form>
+  </div>
+</details>
+{{end}}

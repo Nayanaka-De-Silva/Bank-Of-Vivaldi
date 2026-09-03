@@ -139,6 +139,7 @@ type Vault struct {
 	StrengthScore   int
 	CarryModifierLB int
 	EncumbranceMode EncumbranceMode
+	Kind            VaultKind
 	Notes           string
 	Archived        bool
 	CreatedAt       time.Time

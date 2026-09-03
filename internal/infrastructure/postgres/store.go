@@ -67,9 +67,9 @@ func (s *Store) CreateVault(ctx context.Context, vault domain.Vault) (domain.Vau
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO vaults (
 			id, character_name, strength_score, carry_modifier_lb,
-			encumbrance_mode, notes, archived, created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-	`, vault.ID, vault.CharacterName, vault.StrengthScore, vault.CarryModifierLB, string(vault.EncumbranceMode), vault.Notes, vault.Archived, vault.CreatedAt, vault.UpdatedAt); err != nil {
+			encumbrance_mode, kind, notes, archived, created_at, updated_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+	`, vault.ID, vault.CharacterName, vault.StrengthScore, vault.CarryModifierLB, string(vault.EncumbranceMode), string(vault.Kind), vault.Notes, vault.Archived, vault.CreatedAt, vault.UpdatedAt); err != nil {
 		return domain.Vault{}, err
 	}
 
@@ -94,11 +94,12 @@ func (s *Store) UpdateVault(ctx context.Context, vault domain.Vault) (domain.Vau
 			strength_score = $3,
 			carry_modifier_lb = $4,
 			encumbrance_mode = $5,
-			notes = $6,
-			archived = $7,
-			updated_at = $8
+			kind = $6,
+			notes = $7,
+			archived = $8,
+			updated_at = $9
 		WHERE id = $1
-	`, vault.ID, vault.CharacterName, vault.StrengthScore, vault.CarryModifierLB, string(vault.EncumbranceMode), vault.Notes, vault.Archived, vault.UpdatedAt)
+	`, vault.ID, vault.CharacterName, vault.StrengthScore, vault.CarryModifierLB, string(vault.EncumbranceMode), string(vault.Kind), vault.Notes, vault.Archived, vault.UpdatedAt)
 	if err != nil {
 		return domain.Vault{}, err
 	}
@@ -108,7 +109,7 @@ func (s *Store) UpdateVault(ctx context.Context, vault domain.Vault) (domain.Vau
 func (s *Store) GetVault(ctx context.Context, id string) (domain.Vault, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT v.id, v.character_name, v.strength_score, v.carry_modifier_lb,
-		       v.encumbrance_mode, v.notes, v.archived, v.created_at, v.updated_at,
+		       v.encumbrance_mode, v.kind, v.notes, v.archived, v.created_at, v.updated_at,
 		       COALESCE(p.cp, 0), COALESCE(p.sp, 0), COALESCE(p.ep, 0), COALESCE(p.gp, 0), COALESCE(p.pp, 0)
 		FROM vaults v
 		LEFT JOIN purses p ON p.vault_id = v.id
@@ -120,7 +121,7 @@ func (s *Store) GetVault(ctx context.Context, id string) (domain.Vault, error) {
 func (s *Store) ListVaults(ctx context.Context, includeArchived bool) ([]domain.Vault, error) {
 	query := `
 		SELECT v.id, v.character_name, v.strength_score, v.carry_modifier_lb,
-		       v.encumbrance_mode, v.notes, v.archived, v.created_at, v.updated_at,
+		       v.encumbrance_mode, v.kind, v.notes, v.archived, v.created_at, v.updated_at,
 		       COALESCE(p.cp, 0), COALESCE(p.sp, 0), COALESCE(p.ep, 0), COALESCE(p.gp, 0), COALESCE(p.pp, 0)
 		FROM vaults v
 		LEFT JOIN purses p ON p.vault_id = v.id
@@ -290,12 +291,14 @@ func (s *Store) saveItem(ctx context.Context, item domain.Item, insert bool) err
 func scanVault(scanner interface{ Scan(dest ...any) error }) (domain.Vault, error) {
 	var vault domain.Vault
 	var encumbrance string
+	var kindStr string
 	err := scanner.Scan(
 		&vault.ID,
 		&vault.CharacterName,
 		&vault.StrengthScore,
 		&vault.CarryModifierLB,
 		&encumbrance,
+		&kindStr,
 		&vault.Notes,
 		&vault.Archived,
 		&vault.CreatedAt,
@@ -313,6 +316,7 @@ func scanVault(scanner interface{ Scan(dest ...any) error }) (domain.Vault, erro
 		return domain.Vault{}, err
 	}
 	vault.EncumbranceMode = domain.ParseEncumbranceMode(encumbrance)
+	vault.Kind = domain.VaultKind(kindStr)
 	return vault, nil
 }
 

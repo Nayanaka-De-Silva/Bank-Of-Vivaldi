@@ -49,9 +49,9 @@ Bank of Vivaldi exposes a JSON API under `/api/v1`, alongside the HTML UI. Both 
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/v1/health` | liveness check |
-| `GET` | `/api/v1/vaults` | list vaults, with computed weight/value/encumbrance |
-| `POST` | `/api/v1/vaults` | create a vault |
-| `GET` | `/api/v1/vaults/{id}` | vault detail: summary, item tree, links |
+| `GET` | `/api/v1/vaults` | list vaults with computed weight/value/encumbrance; accepts `?kind=pc\|npc` and `?q=name-fragment` |
+| `POST` | `/api/v1/vaults` | create a vault — **`kind` (`"pc"` or `"npc"`) is required** |
+| `GET` | `/api/v1/vaults/{id}` | vault detail: summary (includes `kind`), item tree, links |
 | `GET` | `/api/v1/vaults/{id}/items` | browse a vault's items (same filters as the compendium) |
 | `POST` | `/api/v1/vaults/{id}/items` | add an item to a vault, inline or transferred from the compendium |
 | `GET` | `/api/v1/vaults/{id}/links` | list external links registered against a vault |
@@ -60,6 +60,8 @@ Bank of Vivaldi exposes a JSON API under `/api/v1`, alongside the HTML UI. Both 
 | `GET` | `/api/v1/compendium/items` | browse/filter the compendium |
 
 Vault deletion is intentionally **not** exposed over the API — it stays a deliberate action in the UI.
+
+**Vault `kind` field:** Every vault has a `kind` — `"pc"` (Player Character) or `"npc"` (NPC). `POST /api/v1/vaults` returns a 400 with a `kind` field error when `kind` is omitted or unrecognised. Existing rows without a kind were backfilled to `"pc"` by migration `003_vault_kind.sql`. The `kind` field appears in every vault response object.
 
 List endpoints return `{"data": [...], "meta": {"page", "pageSize", "totalItems", "totalPages"}}`; single-resource endpoints return the raw object; errors return `{"error": {"code", "message", "details"?}}` with a matching HTTP status. Weight is in hundredths of a pound and value is in copper pieces, matching the domain's internal units.
 
