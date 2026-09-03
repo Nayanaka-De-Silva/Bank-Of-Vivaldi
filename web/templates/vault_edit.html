@@ -14,6 +14,13 @@
           <option value="optional" {{if eq .VaultDetail.Summary.Vault.EncumbranceMode "optional"}}selected{{end}}>Optional</option>
         </select>
       </label>
+      <label>Type
+        <select name="kind" required>
+          {{range vaultKinds}}
+            <option value="{{.}}" {{if eq (printf "%s" .) (printf "%s" $.VaultDetail.Summary.Vault.Kind)}}selected{{end}}>{{.Label}}</option>
+          {{end}}
+        </select>
+      </label>
       <label>Notes <textarea name="notes" rows="4">{{.VaultDetail.Summary.Vault.Notes}}</textarea></label>
       {{template "checkbox_field" (checkbox "Archived" "archived" .VaultDetail.Summary.Vault.Archived)}}
       <button type="submit">Save vault</button>

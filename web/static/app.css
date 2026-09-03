@@ -317,6 +317,9 @@
   .list-none {
     list-style-type: none;
   }
+  .grid-cols-\[repeat\(auto-fill\,minmax\(200px\,1fr\)\)\] {
+    grid-template-columns: repeat(auto-fill,minmax(200px,1fr));
+  }
   .grid-cols-\[repeat\(auto-fill\,minmax\(260px\,1fr\)\)\] {
     grid-template-columns: repeat(auto-fill,minmax(260px,1fr));
   }

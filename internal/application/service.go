@@ -59,6 +59,7 @@ type VaultSummary struct {
 	TotalPurseValueCP          int
 	TotalCombinedValueCP       int
 	EncumbranceState           domain.EncumbranceState
+	ItemCount                  int
 }
 
 type ItemNode struct {
@@ -132,6 +133,7 @@ type CreateVaultInput struct {
 	StrengthScore   int
 	CarryModifierLB int
 	Notes           string
+	Kind            domain.VaultKind
 }
 
 type UpdateVaultInput struct {
@@ -140,6 +142,7 @@ type UpdateVaultInput struct {
 	StrengthScore   int
 	CarryModifierLB int
 	EncumbranceMode domain.EncumbranceMode
+	Kind            domain.VaultKind
 	Notes           string
 	Archived        bool
 }
@@ -160,7 +163,7 @@ func (s *Service) Settings(ctx context.Context) (domain.AppSettings, error) {
 	return s.store.GetAppSettings(ctx)
 }
 
-func (s *Service) Dashboard(ctx context.Context) (DashboardData, error) {
+func (s *Service) Dashboard(ctx context.Context, filters VaultListFilters) (DashboardData, error) {
 	settings, err := s.store.GetAppSettings(ctx)
 	if err != nil {
 		return DashboardData{}, err
@@ -176,9 +179,14 @@ func (s *Service) Dashboard(ctx context.Context) (DashboardData, error) {
 		return DashboardData{}, err
 	}
 
+	summaries, err := filters.Apply(summarizeVaults(vaults, items))
+	if err != nil {
+		return DashboardData{}, err
+	}
+
 	data := DashboardData{
 		Settings:          settings,
-		Vaults:            summarizeVaults(vaults, items),
+		Vaults:            summaries,
 		CompendiumWeight:  domain.ComputeCompendiumWeightHundredths(items),
 		CompendiumValueCP: domain.ComputeCompendiumValueCP(items),
 	}
@@ -189,7 +197,7 @@ func (s *Service) Dashboard(ctx context.Context) (DashboardData, error) {
 	return data, nil
 }
 
-func (s *Service) ListVaults(ctx context.Context) ([]VaultSummary, domain.AppSettings, error) {
+func (s *Service) ListVaults(ctx context.Context, filters VaultListFilters) ([]VaultSummary, domain.AppSettings, error) {
 	settings, err := s.store.GetAppSettings(ctx)
 	if err != nil {
 		return nil, domain.AppSettings{}, err
@@ -205,7 +213,12 @@ func (s *Service) ListVaults(ctx context.Context) ([]VaultSummary, domain.AppSet
 		return nil, domain.AppSettings{}, err
 	}
 
-	return summarizeVaults(vaults, items), settings, nil
+	summaries, err := filters.Apply(summarizeVaults(vaults, items))
+	if err != nil {
+		return nil, domain.AppSettings{}, err
+	}
+
+	return summaries, settings, nil
 }
 
 func (s *Service) CreateVault(ctx context.Context, input CreateVaultInput) (domain.Vault, error) {
@@ -214,6 +227,9 @@ func (s *Service) CreateVault(ctx context.Context, input CreateVaultInput) (doma
 	}
 	if input.StrengthScore < 1 {
 		return domain.Vault{}, fmt.Errorf("strength score must be at least 1")
+	}
+	if !input.Kind.Valid() {
+		return domain.Vault{}, fmt.Errorf("vault type is required (pc or npc)")
 	}
 
 	settings, err := s.store.GetAppSettings(ctx)
@@ -228,6 +244,7 @@ func (s *Service) CreateVault(ctx context.Context, input CreateVaultInput) (doma
 		StrengthScore:   input.StrengthScore,
 		CarryModifierLB: input.CarryModifierLB,
 		EncumbranceMode: settings.DefaultEncumbranceMode,
+		Kind:            input.Kind,
 		Notes:           strings.TrimSpace(input.Notes),
 		CreatedAt:       now,
 		UpdatedAt:       now,
@@ -248,11 +265,15 @@ func (s *Service) UpdateVault(ctx context.Context, input UpdateVaultInput) (doma
 	if input.StrengthScore < 1 {
 		return domain.Vault{}, fmt.Errorf("strength score must be at least 1")
 	}
+	if !input.Kind.Valid() {
+		return domain.Vault{}, fmt.Errorf("vault type is required (pc or npc)")
+	}
 
 	vault.CharacterName = strings.TrimSpace(input.CharacterName)
 	vault.StrengthScore = input.StrengthScore
 	vault.CarryModifierLB = input.CarryModifierLB
 	vault.EncumbranceMode = domain.ParseEncumbranceMode(string(input.EncumbranceMode))
+	vault.Kind = input.Kind
 	vault.Notes = strings.TrimSpace(input.Notes)
 	vault.Archived = input.Archived
 	vault.UpdatedAt = s.now().UTC()
@@ -944,6 +965,13 @@ func summarizeVaults(vaults []domain.Vault, items []domain.Item) []VaultSummary 
 		totalItemValue := domain.ComputeVaultItemValueCP(items, vault.ID)
 		totalPurseValue := domain.ComputePurseValueCP(vault.Purse)
 
+		itemCount := 0
+		for _, item := range items {
+			if item.Location.OwnerVaultID == vault.ID {
+				itemCount++
+			}
+		}
+
 		summaries = append(summaries, VaultSummary{
 			Vault:                      vault,
 			TotalItemWeightHundredths:  totalItemWeight,
@@ -955,6 +983,7 @@ func summarizeVaults(vaults []domain.Vault, items []domain.Item) []VaultSummary 
 			TotalPurseValueCP:          totalPurseValue,
 			TotalCombinedValueCP:       totalItemValue + totalPurseValue,
 			EncumbranceState:           domain.GetEncumbranceState(totalCarry, vault),
+			ItemCount:                  itemCount,
 		})
 	}
 

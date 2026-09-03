@@ -35,6 +35,7 @@ type TemplateData struct {
 	CompendiumFilters         application.CompendiumFilters
 	CompendiumView            string
 	FilterBar                 FilterBarData
+	VaultFilterBar            VaultFilterBarData
 	SearchResults             []application.SearchResult
 	BulkPreview               domain.BulkPreview
 	BulkText                  string
@@ -102,6 +103,53 @@ type FilterBarData struct {
 	// distinct per caller (compendium vs. vault) so localStorage state doesn't
 	// collide between the two browsers.
 	PanelKey string
+}
+
+// VaultFilterBarData is the view model for the vault_filter_bar partial used on
+// the dashboard and the vaults list page. It mirrors FilterBarData but carries
+// VaultListFilters instead of CompendiumFilters and exposes vault-specific
+// vocabulary (VaultKinds, EncumbranceStates).
+type VaultFilterBarData struct {
+	Action   string
+	ResetURL string
+	Filters  application.VaultListFilters
+	PanelKey string
+}
+
+// newVaultFilterBar builds the VaultFilterBarData for a vault list or dashboard.
+// ResetURL is always the bare action URL: resetting drops every query parameter,
+// which is exactly what an unqualified GET to the action does.
+func newVaultFilterBar(action string, filters application.VaultListFilters, panelKey string) VaultFilterBarData {
+	return VaultFilterBarData{
+		Action:   action,
+		ResetURL: action,
+		Filters:  filters,
+		PanelKey: panelKey,
+	}
+}
+
+// vaultKindLabel returns the display label for a vault kind string.
+func vaultKindLabel(kind any) string {
+	k, ok := domain.ParseVaultKind(fmt.Sprint(kind))
+	if !ok {
+		return fmt.Sprint(kind)
+	}
+	return k.Label()
+}
+
+// vaultFilterPanel builds the panel header for a vault filter bar.
+func vaultFilterPanel(level, title string, filters application.VaultListFilters) panelHeader {
+	header := panelHeader{Level: level, Title: title}
+	count := filters.ActiveFilterCount()
+	switch {
+	case count == 0:
+		header.Meta = "No filters applied"
+	case count == 1:
+		header.Badge = "1 filter active"
+	default:
+		header.Badge = fmt.Sprintf("%d filters active", count)
+	}
+	return header
 }
 
 // panelHeader is the view model for the panel_summary partial: the single
@@ -275,8 +323,21 @@ func NewServer(service *application.Service) (*Server, error) {
 		"checkbox":               checkbox,
 		"weaponPropertyCheckbox": weaponPropertyCheckbox,
 		// Build panel_summary view models for the collapsible sections (issue #30).
-		"panel":       panel,
-		"filterPanel": filterPanel,
+		"panel":            panel,
+		"filterPanel":      filterPanel,
+		"vaultFilterPanel": vaultFilterPanel,
+		// Vault-kind helpers for select options and badges.
+		"vaultKindLabel": vaultKindLabel,
+		"vaultKinds":     domain.VaultKinds,
+		// Encumbrance state values for vault filter dropdowns.
+		"encumbranceStates": func() []string {
+			return []string{
+				string(domain.EncumbranceStateNormal),
+				string(domain.EncumbranceStateEncumbered),
+				string(domain.EncumbranceStateHeavilyEncumbered),
+				string(domain.EncumbranceStateOverCapacity),
+			}
+		},
 	}
 
 	tmpl, err := template.New("pages").Funcs(funcs).ParseFS(webassets.FS, "templates/*.html")
@@ -320,17 +381,34 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := s.service.Dashboard(r.Context())
+	filters := parseVaultListFilters(r)
+	data, err := s.service.Dashboard(r.Context(), filters)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// A malformed filter value is user error, not a server fault: re-render
+		// unfiltered with the message so the DM can correct the field, mirroring
+		// handleCompendium's error branch.
+		filterErr := err.Error()
+		data, err = s.service.Dashboard(r.Context(), application.VaultListFilters{})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		s.render(w, "dashboard", http.StatusBadRequest, TemplateData{
+			Title:          "Dashboard",
+			Error:          filterErr,
+			AppSettings:    data.Settings,
+			Dashboard:      data,
+			VaultFilterBar: newVaultFilterBar("/", filters, "dashboard-vault-filters"),
+		})
 		return
 	}
 
 	s.render(w, "dashboard", http.StatusOK, TemplateData{
-		Title:       "Dashboard",
-		Notice:      r.URL.Query().Get("notice"),
-		AppSettings: data.Settings,
-		Dashboard:   data,
+		Title:          "Dashboard",
+		Notice:         r.URL.Query().Get("notice"),
+		AppSettings:    data.Settings,
+		Dashboard:      data,
+		VaultFilterBar: newVaultFilterBar("/", filters, "dashboard-vault-filters"),
 	})
 }
 
@@ -351,16 +429,32 @@ func (s *Server) handleSetEncumbrance(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleVaults(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		vaults, settings, err := s.service.ListVaults(r.Context())
+		filters := parseVaultListFilters(r)
+		vaults, settings, err := s.service.ListVaults(r.Context(), filters)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			// A malformed filter value is user error, not a server fault:
+			// re-render unfiltered with the message, mirroring handleCompendium.
+			filterErr := err.Error()
+			vaults, settings, err = s.service.ListVaults(r.Context(), application.VaultListFilters{})
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			s.render(w, "vaults", http.StatusBadRequest, TemplateData{
+				Title:          "Vaults",
+				Error:          filterErr,
+				AppSettings:    settings,
+				Vaults:         vaults,
+				VaultFilterBar: newVaultFilterBar("/vaults", filters, "vault-list-filters"),
+			})
 			return
 		}
 		s.render(w, "vaults", http.StatusOK, TemplateData{
-			Title:       "Vaults",
-			Notice:      r.URL.Query().Get("notice"),
-			AppSettings: settings,
-			Vaults:      vaults,
+			Title:          "Vaults",
+			Notice:         r.URL.Query().Get("notice"),
+			AppSettings:    settings,
+			Vaults:         vaults,
+			VaultFilterBar: newVaultFilterBar("/vaults", filters, "vault-list-filters"),
 		})
 	case http.MethodPost:
 		strength, err := parseIntField(r.FormValue("strength_score"))
@@ -374,22 +468,25 @@ func (s *Server) handleVaults(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		kind, _ := domain.ParseVaultKind(r.FormValue("kind"))
 		if _, err := s.service.CreateVault(r.Context(), application.CreateVaultInput{
 			CharacterName:   r.FormValue("character_name"),
 			StrengthScore:   strength,
 			CarryModifierLB: carryModifier,
 			Notes:           r.FormValue("notes"),
+			Kind:            kind,
 		}); err != nil {
-			vaults, settings, listErr := s.service.ListVaults(r.Context())
+			vaults, settings, listErr := s.service.ListVaults(r.Context(), application.VaultListFilters{})
 			if listErr != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 			s.render(w, "vaults", http.StatusBadRequest, TemplateData{
-				Title:       "Vaults",
-				Error:       err.Error(),
-				AppSettings: settings,
-				Vaults:      vaults,
+				Title:          "Vaults",
+				Error:          err.Error(),
+				AppSettings:    settings,
+				Vaults:         vaults,
+				VaultFilterBar: newVaultFilterBar("/vaults", application.VaultListFilters{}, "vault-list-filters"),
 			})
 			return
 		}
@@ -445,12 +542,14 @@ func (s *Server) handleVaultDetail(w http.ResponseWriter, r *http.Request, id st
 			return
 		}
 
+		editKind, _ := domain.ParseVaultKind(r.FormValue("kind"))
 		_, err = s.service.UpdateVault(r.Context(), application.UpdateVaultInput{
 			ID:              id,
 			CharacterName:   r.FormValue("character_name"),
 			StrengthScore:   strength,
 			CarryModifierLB: carryModifier,
 			EncumbranceMode: domain.ParseEncumbranceMode(r.FormValue("encumbrance_mode")),
+			Kind:            editKind,
 			Notes:           r.FormValue("notes"),
 			Archived:        r.FormValue("archived") == "on",
 		})
@@ -605,6 +704,24 @@ func normalizeCompendiumView(value string) string {
 		return compendiumViewList
 	}
 	return compendiumViewTiles
+}
+
+// parseVaultListFilters maps the vault list/dashboard query string onto the raw
+// filter values the application layer parses and the template repopulates.
+func parseVaultListFilters(r *http.Request) application.VaultListFilters {
+	query := r.URL.Query()
+	return application.VaultListFilters{
+		Query:         query.Get("q"),
+		Kind:          query.Get("kind"),
+		MinCarryLB:    query.Get("min_carry_lb"),
+		MaxCarryLB:    query.Get("max_carry_lb"),
+		MinCapacityLB: query.Get("min_capacity_lb"),
+		MaxCapacityLB: query.Get("max_capacity_lb"),
+		MinItems:      query.Get("min_items"),
+		MaxItems:      query.Get("max_items"),
+		State:         query.Get("state"),
+		SortBy:        query.Get("sort"),
+	}
 }
 
 // parseCompendiumFilters maps the compendium browse query string onto the raw

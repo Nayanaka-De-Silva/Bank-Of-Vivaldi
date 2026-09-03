@@ -13,6 +13,7 @@
       <a href="/vaults/{{.VaultDetail.Summary.Vault.ID}}/edit">Edit vault</a>
     </div>
     <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4 text-sm">
+      <p class="m-0"><strong>Type:</strong> <span class="rounded-full border border-edge px-1.5 py-0.5 text-[0.72rem] uppercase tracking-wide">{{vaultKindLabel .VaultDetail.Summary.Vault.Kind}}</span></p>
       <p class="m-0"><strong>Carry:</strong> {{weight .VaultDetail.Summary.TotalCarryWeightHundredths}} / {{weight .VaultDetail.Summary.MaxCarryWeightHundredths}} lb</p>
       <p class="m-0"><strong>Push / drag / lift:</strong> {{weight .VaultDetail.Summary.PushDragLiftHundredths}} lb</p>
       <p class="m-0"><strong>State:</strong> {{humanize .VaultDetail.Summary.EncumbranceState}}</p>

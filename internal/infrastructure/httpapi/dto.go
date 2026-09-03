@@ -18,6 +18,7 @@ type vaultResponse struct {
 	StrengthScore   int           `json:"strengthScore"`
 	CarryModifierLB int           `json:"carryModifierLb"`
 	EncumbranceMode string        `json:"encumbranceMode"`
+	Kind            string        `json:"kind"`
 	Notes           string        `json:"notes"`
 	Archived        bool          `json:"archived"`
 	Purse           purseResponse `json:"purse"`
@@ -38,6 +39,7 @@ func newVaultResponse(v domain.Vault) vaultResponse {
 		StrengthScore:   v.StrengthScore,
 		CarryModifierLB: v.CarryModifierLB,
 		EncumbranceMode: string(v.EncumbranceMode),
+		Kind:            string(v.Kind),
 		Notes:           v.Notes,
 		Archived:        v.Archived,
 		Purse: purseResponse{
@@ -197,6 +199,7 @@ type createVaultRequest struct {
 	StrengthScore   int    `json:"strengthScore"`
 	CarryModifierLB int    `json:"carryModifierLb"`
 	Notes           string `json:"notes"`
+	Kind            string `json:"kind"`
 }
 
 func (r createVaultRequest) validate() []FieldError {
@@ -206,6 +209,9 @@ func (r createVaultRequest) validate() []FieldError {
 	}
 	if r.StrengthScore < 1 {
 		errs = append(errs, FieldError{Field: "strengthScore", Message: "must be at least 1"})
+	}
+	if _, ok := domain.ParseVaultKind(r.Kind); !ok {
+		errs = append(errs, FieldError{Field: "kind", Message: `must be "pc" or "npc"`})
 	}
 	return errs
 }

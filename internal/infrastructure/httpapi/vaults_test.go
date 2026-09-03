@@ -49,7 +49,7 @@ func TestCreateVaultThenGetIt(t *testing.T) {
 	h := server.Routes()
 
 	rec := doJSON(t, h, http.MethodPost, "/vaults", createVaultRequest{
-		CharacterName: "Bruenor", StrengthScore: 16,
+		CharacterName: "Bruenor", StrengthScore: 16, Kind: "pc",
 	})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d (%s)", rec.Code, rec.Body.String())
@@ -102,8 +102,8 @@ func TestGetVaultUnknownIsNotFound(t *testing.T) {
 
 func TestListVaultsEnvelope(t *testing.T) {
 	server, store := newTestServer()
-	store.vaults["v1"] = domain.Vault{ID: "v1", CharacterName: "Aria", StrengthScore: 10, EncumbranceMode: domain.EncumbranceModeStandard}
-	store.vaults["v2"] = domain.Vault{ID: "v2", CharacterName: "Bram", StrengthScore: 12, EncumbranceMode: domain.EncumbranceModeStandard}
+	store.vaults["v1"] = domain.Vault{ID: "v1", CharacterName: "Aria", StrengthScore: 10, EncumbranceMode: domain.EncumbranceModeStandard, Kind: domain.VaultKindPC}
+	store.vaults["v2"] = domain.Vault{ID: "v2", CharacterName: "Bram", StrengthScore: 12, EncumbranceMode: domain.EncumbranceModeStandard, Kind: domain.VaultKindPC}
 
 	rec := doJSON(t, server.Routes(), http.MethodGet, "/vaults", nil)
 	if rec.Code != http.StatusOK {
@@ -139,7 +139,7 @@ func TestVaultRoutesMethodNotAllowed(t *testing.T) {
 
 func TestLinkAndUnlinkVaultViaHTTP(t *testing.T) {
 	server, store := newTestServer()
-	store.vaults["v1"] = domain.Vault{ID: "v1", CharacterName: "Aria", StrengthScore: 10, EncumbranceMode: domain.EncumbranceModeStandard}
+	store.vaults["v1"] = domain.Vault{ID: "v1", CharacterName: "Aria", StrengthScore: 10, EncumbranceMode: domain.EncumbranceModeStandard, Kind: domain.VaultKindPC}
 	h := server.Routes()
 
 	rec := doJSON(t, h, http.MethodPost, "/vaults/v1/link", linkVaultRequest{ExternalRef: "npc-manager:42"})
@@ -175,5 +175,64 @@ func TestLinkVaultUnknownVaultIsNotFound(t *testing.T) {
 	rec := doJSON(t, server.Routes(), http.MethodPost, "/vaults/nope/link", linkVaultRequest{ExternalRef: "x"})
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d (%s)", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCreateVaultRequiresKind(t *testing.T) {
+	server, _ := newTestServer()
+
+	// Missing kind should yield 400 with a "kind" field error.
+	rec := doJSON(t, server.Routes(), http.MethodPost, "/vaults", createVaultRequest{
+		CharacterName: "Legolas", StrengthScore: 11,
+	})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d (%s)", rec.Code, rec.Body.String())
+	}
+	errObj := decodeErrorEnvelope(t, rec)
+	if errObj["code"] != "INVALID_INPUT" {
+		t.Fatalf("expected INVALID_INPUT, got %v", errObj["code"])
+	}
+}
+
+func TestCreateVaultWithNPCKindRespondsKind(t *testing.T) {
+	server, _ := newTestServer()
+
+	rec := doJSON(t, server.Routes(), http.MethodPost, "/vaults", createVaultRequest{
+		CharacterName: "The Dragon", StrengthScore: 20, Kind: "npc",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d (%s)", rec.Code, rec.Body.String())
+	}
+	var created vaultResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if created.Kind != "npc" {
+		t.Fatalf("expected kind %q, got %q", "npc", created.Kind)
+	}
+}
+
+func TestListVaultsKindFilter(t *testing.T) {
+	server, store := newTestServer()
+	store.vaults["pc1"] = domain.Vault{ID: "pc1", CharacterName: "Frodo", StrengthScore: 8, EncumbranceMode: domain.EncumbranceModeStandard, Kind: domain.VaultKindPC}
+	store.vaults["npc1"] = domain.Vault{ID: "npc1", CharacterName: "Sauron", StrengthScore: 25, EncumbranceMode: domain.EncumbranceModeStandard, Kind: domain.VaultKindNPC}
+
+	rec := doJSON(t, server.Routes(), http.MethodGet, "/vaults?kind=npc", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var envelope struct {
+		Data []vaultSummaryResponse `json:"data"`
+		Meta listMeta               `json:"meta"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(envelope.Data) != 1 {
+		t.Fatalf("expected 1 NPC vault, got %d", len(envelope.Data))
+	}
+	if envelope.Data[0].Vault.CharacterName != "Sauron" {
+		t.Fatalf("expected Sauron, got %q", envelope.Data[0].Vault.CharacterName)
 	}
 }
