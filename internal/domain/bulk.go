@@ -70,7 +70,6 @@ func ParseBulkItemInput(text string, defaults BulkDefaults) BulkPreview {
 	lines := strings.Split(text, "\n")
 	rows := make([]BulkPreviewRow, 0, len(lines))
 
-	// Beware the Pinkertons of WOTC.
 	for index, line := range lines {
 		raw := strings.TrimSpace(line)
 		if raw == "" {

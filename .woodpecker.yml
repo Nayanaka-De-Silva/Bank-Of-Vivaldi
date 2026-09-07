@@ -28,7 +28,7 @@ steps:
       - build-image
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /home/krystler/containers/bank-of-vivaldi:/deploy
+      - /opt/stacks/bank-of-vivaldi:/deploy
     commands:
       - mkdir -p /deploy
       - cp docker-compose.prod.yml /deploy/docker-compose.prod.yml
