@@ -26,19 +26,26 @@ steps:
     privileged: true
     depends_on:
       - build-image
+    environment:
+      # Production config lives in the 'prod_dotenv' Woodpecker repo secret
+      # (repo settings -> Secrets), not a file on the runner host.
+      PROD_DOTENV:
+        from_secret: prod_dotenv
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /opt/stacks/bank-of-vivaldi:/deploy
     commands:
-      - mkdir -p /deploy
-      - cp docker-compose.prod.yml /deploy/docker-compose.prod.yml
-      - cp .env.example /deploy/.env.example
       - |-
-        test -f /deploy/.env || {
-          echo "Missing /deploy/.env. Copy /deploy/.env.example to /deploy/.env and set production values before deploying." >&2
+        if [ -z "$${PROD_DOTENV}" ]; then
+          echo "The 'prod_dotenv' secret is missing or empty. Add the production .env contents as a Woodpecker repo secret named prod_dotenv." >&2
           exit 1
-        }
-      - cd /deploy
+        fi
+      # Assemble a throwaway deploy dir in the CI workspace; it is discarded
+      # when the pipeline ends. The stack's data lives in Docker named volumes
+      # keyed by the -p project name, untouched by this.
+      - mkdir -p deploy
+      - cp docker-compose.prod.yml deploy/docker-compose.prod.yml
+      - printf '%s\n' "$${PROD_DOTENV}" > deploy/.env
+      - cd deploy
       - docker compose -p bank-of-vivaldi -f ./docker-compose.prod.yml config >/dev/null
       - APP_IMAGE=bank-of-vivaldi:latest docker compose -p bank-of-vivaldi -f ./docker-compose.prod.yml up --force-recreate -d --remove-orphans --wait --wait-timeout 120
       - docker image prune -f
