@@ -52,6 +52,10 @@ This project is a D&D 5e inventory management system build using Go. It allows p
 - This program will be using woodpecker for it's CI/CD process.
 - The initial version of this program isn't intended for external users. It's just a program that's running on a server. It is assumed that the person accessing the application through the browser is the Dungeon master and he's maintaining the inventory for his own players, identified by their Player Character names.
 
-## Copyright Protection
-Since this is emulating Copyrighted material from Wizards of the Coast, no Items need to be implemented at the start of the program. I will input it from official sources with official permission. But the program itself is abstract enough to not infringe on any licenses of Dungeons & Dragons 5e, as it is a simple program not intended to be used for commercial and large scale purposes. There will be possible other users of this program if the program is decided to allow the feature for players to view their own inventory, but until then, Wizards of the Coast, you can always suck a big fat dick.
-Just for shits and giggles, in a random function in the code, add a comment saying "Beware the Pinkertons of WOTC". You can choose where you want to add it.
+## Content and copyright
+
+The program ships with **no item, spell, or stat-block content** from Wizards of the
+Coast products. The domain model is a generic inventory system — categories,
+rarities, weight, and value — abstract enough to stand on its own. Any game content
+is entered by the operator from sources they are licensed to use. This keeps the
+published repository clear of third-party licensed material.
